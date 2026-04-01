@@ -2,48 +2,33 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR World - Global Sync</title>
+  <title>VVR World - Final Stable</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     :root { --primary: #667eea; --accent: #ff6b81; --bg: #0a0a0a; --card: #1a1a1a; }
     body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); color: #eee; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-
-    /* 登录系统 */
     #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(15px); }
     .login-box { background: var(--card); padding: 30px; border-radius: 24px; width: 85%; max-width: 320px; text-align: center; border: 1px solid #333; }
     .login-box input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; outline: none; }
     .login-box button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--primary); color: white; font-weight: bold; margin-top: 15px; cursor: pointer; }
-
-    /* 导航 */
     nav { display: flex; justify-content: space-around; background: var(--card); padding: 15px 0; border-bottom: 1px solid #222; }
-    nav button { background: none; border: none; color: #666; font-weight: bold; cursor: pointer; transition: 0.3s; }
+    nav button { background: none; border: none; color: #666; font-weight: bold; cursor: pointer; }
     nav button.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
-
     .page { display: none; flex: 1; flex-direction: column; overflow: hidden; }
     .page.active { display: flex; }
-
-    /* 列表显示 (聊天 & 留言板) */
     .scroll-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
     .bubble { padding: 12px 16px; border-radius: 18px; max-width: 80%; font-size: 15px; }
-    .user { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 2px; }
-    .bot { background: #2a2a2a; align-self: flex-start; border: 1px solid #333; border-bottom-left-radius: 2px; }
-
-    /* 留言板卡片 */
-    .post-card { background: var(--card); padding: 15px; border-radius: 12px; border-left: 4px solid var(--accent); position: relative; animation: fadeIn 0.4s; }
-    .post-user { font-size: 12px; color: var(--accent); font-weight: bold; margin-bottom: 5px; }
-    .post-time { font-size: 10px; color: #555; position: absolute; right: 15px; top: 15px; }
-
-    /* 通话组件 */
+    .user { background: var(--primary); align-self: flex-end; }
+    .bot { background: #2a2a2a; align-self: flex-start; border: 1px solid #333; }
+    .post-card { background: var(--card); padding: 15px; border-radius: 12px; border-left: 4px solid var(--accent); position: relative; margin-bottom: 10px; }
+    .post-user { font-size: 12px; color: var(--accent); font-weight: bold; }
     .call-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .v-ava { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #764ba2); display: flex; align-items: center; justify-content: center; font-size: 60px; border: 4px solid #222; transition: 0.4s; margin-bottom: 20px; }
+    .v-ava { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #764ba2); display: flex; align-items: center; justify-content: center; font-size: 60px; border: 4px solid #222; margin-bottom: 20px; transition: 0.4s; }
     .speaking { border-color: var(--accent); box-shadow: 0 0 30px rgba(255, 107, 129, 0.4); }
-
     .input-bar { padding: 15px 15px 35px; background: var(--card); display: flex; gap: 10px; }
     .input-bar input { flex: 1; background: #252525; border: none; padding: 12px; border-radius: 20px; color: white; outline: none; }
     .input-bar button { background: var(--primary); border: none; padding: 0 20px; border-radius: 20px; color: white; font-weight: bold; }
-
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
@@ -53,7 +38,7 @@
     <h2 style="color:var(--primary); margin-top:0;">VVR 系统登录</h2>
     <input type="text" id="acc" placeholder="账号 (xiaola / vvr)">
     <input type="password" id="pwd" placeholder="密码">
-    <button onclick="doLogin()">进入同步世界</button>
+    <button id="loginBtn">进入同步世界</button>
   </div>
 </div>
 
@@ -69,7 +54,7 @@
     <p id="c-status" style="color:#666">等待拨号</p>
   </div>
   <div style="display:flex; flex-direction:column; align-items:center; gap:20px; padding-bottom:60px;">
-    <button id="int-btn" style="background:#5856d6; color:white; border:none; padding:10px 25px; border-radius:20px; display:none;" onclick="interrupt()">插嘴 / 我要说话</button>
+    <button id="int-btn" style="background:#5856d6; color:white; border:none; padding:10px 25px; border-radius:20px; display:none;" onclick="interrupt()">插嘴</button>
     <div style="display:flex; gap:30px;">
       <button id="s-btn" onclick="startCall()" style="width:70px;height:70px;border-radius:50%;background:#34c759;border:none;font-size:30px;">📞</button>
       <button onclick="location.reload()" style="width:70px;height:70px;border-radius:50%;background:#ff3b30;border:none;font-size:30px;">❌</button>
@@ -88,97 +73,113 @@
 </div>
 
 <script>
-// 使用你之前提供的 Supabase 配置
-const SUPABASE_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
-const SUPABASE_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// 所有的逻辑封装在 DOMContentLoaded 中，确保页面加载完再跑 JS
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // 配置 Supabase
+    const SUPABASE_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
+    const SUPABASE_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let currentUser = "";
-let callActive = false;
-let chatHistory = [];
-const synth = window.speechSynthesis;
-let recognition;
+    let currentUser = "";
+    let callActive = false;
+    let chatHistory = [];
+    const synth = window.speechSynthesis;
+    let recognition;
 
-function doLogin() {
-    const a = document.getElementById('acc').value.trim();
-    const p = document.getElementById('pwd').value;
-    if((a==='xiaola'&&p==='123456') || (a==='vvr'&&p==='654321')) {
-        currentUser = a;
-        document.getElementById('login-overlay').style.display = 'none';
-        syncBoard(); 
-    } else { alert("账号密码不匹配"); }
-}
-
-async function saveToCloud() {
-    const content = document.getElementById('board-in').value.trim();
-    if(!content) return;
-    const { error } = await supabase.from('messages').insert([{ author: currentUser, content: content, created_at: new Date() }]);
-    if(!error) { document.getElementById('board-in').value = ""; syncBoard(); }
-}
-
-async function syncBoard() {
-    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
-    if(data) {
-        const box = document.getElementById('board-list'); box.innerHTML = "";
-        data.forEach(m => {
-            const d = document.createElement('div'); d.className = "post-card";
-            d.innerHTML = `<span class="post-time">${new Date(m.created_at).toLocaleTimeString()}</span><div class="post-user">@${m.author}</div><div>${m.content}</div>`;
-            box.appendChild(d);
-        });
-    }
-}
-
-function startCall() {
-    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new Speech(); recognition.lang = 'en-US';
-    recognition.onresult = (e) => processAction(e.results[0][0].transcript, true);
-    recognition.onend = () => { if(callActive && !synth.speaking) recognition.start(); };
-    callActive = true;
-    document.getElementById('s-btn').style.display='none';
-    document.getElementById('int-btn').style.display='block';
-    synth.speak(new SpeechSynthesisUtterance(""));
-    vvrTalk(`Hello ${currentUser}, connection established.`);
-}
-
-function interrupt() {
-    if(synth.speaking) synth.cancel();
-    try { recognition.stop(); setTimeout(() => recognition.start(), 300); } catch(e) { recognition.start(); }
-}
-
-async function processAction(text, isVoice) {
-    if(isVoice && synth.speaking) synth.cancel();
-    if(!isVoice) appendBubble(text, 'user');
-    document.getElementById('c-status').innerText = "你: " + text;
-    try {
-        const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, history: chatHistory }) });
-        const data = await res.json();
-        if (data.reply) {
-            chatHistory.push({role:"user", content:text}, {role:"assistant", content:data.reply});
-            appendBubble(data.reply, 'bot');
-            vvrTalk(data.reply);
+    // --- 修复：手动绑定登录按钮事件 ---
+    document.getElementById('loginBtn').addEventListener('click', () => {
+        const a = document.getElementById('acc').value.trim();
+        const p = document.getElementById('pwd').value;
+        if((a==='xiaola'&&p==='123456') || (a==='vvr'&&p==='654321')) {
+            currentUser = a;
+            document.getElementById('login-overlay').style.display = 'none';
+            syncBoard(); 
+        } else {
+            alert("账号密码不匹配");
         }
-    } catch (e) { console.error(e); }
-}
+    });
 
-function vvrTalk(text) {
-    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = 'en-US';
-    utter.onstart = () => { document.getElementById('v-ava').classList.add('speaking'); document.getElementById('c-status').innerText = "VVR: " + text; if(recognition) try{recognition.stop()}catch(e){} };
-    utter.onend = () => { document.getElementById('v-ava').classList.remove('speaking'); if(callActive) setTimeout(()=>recognition.start(), 500); };
-    synth.speak(utter);
-}
+    // --- 全球留言逻辑 ---
+    window.saveToCloud = async () => {
+        const content = document.getElementById('board-in').value.trim();
+        if(!content) return;
+        const { error } = await supabaseClient.from('messages').insert([{ author: currentUser, content: content, created_at: new Date() }]);
+        if(!error) { document.getElementById('board-in').value = ""; syncBoard(); }
+        else { console.error(error); alert("保存失败，请检查数据库表权限"); }
+    };
 
-function setTab(t) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.getElementById('p-'+t).classList.add('active');
-    document.getElementById('t-'+t).classList.add('active');
-    if(t === 'board') syncBoard();
-}
+    window.syncBoard = async () => {
+        const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false });
+        if(data) {
+            const box = document.getElementById('board-list'); box.innerHTML = "";
+            data.forEach(m => {
+                const d = document.createElement('div'); d.className = "post-card";
+                d.innerHTML = `<div class="post-user">@${m.author}</div><div>${m.content}</div>`;
+                box.appendChild(d);
+            });
+        }
+    };
 
-function sendTextChat() { const i = document.getElementById('chat-in'); if(i.value.trim()){ processAction(i.value.trim(), false); i.value=""; } }
-function appendBubble(t, c) { const l = document.getElementById('chat-list'); const d = document.createElement('div'); d.className=`bubble ${c}`; d.innerText=t; l.appendChild(d); l.scrollTop = l.scrollHeight; }
+    // --- 通话逻辑 ---
+    window.startCall = () => {
+        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new Speech(); recognition.lang = 'en-US';
+        recognition.onresult = (e) => processAction(e.results[0][0].transcript, true);
+        recognition.onend = () => { if(callActive && !synth.speaking) recognition.start(); };
+        callActive = true;
+        document.getElementById('s-btn').style.display='none';
+        document.getElementById('int-btn').style.display='block';
+        synth.speak(new SpeechSynthesisUtterance(""));
+        vvrTalk(`Connected. Hello ${currentUser}.`);
+    };
+
+    window.interrupt = () => {
+        if(synth.speaking) synth.cancel();
+        try { recognition.stop(); setTimeout(() => recognition.start(), 300); } catch(e) { recognition.start(); }
+    };
+
+    async function processAction(text, isVoice) {
+        if(isVoice && synth.speaking) synth.cancel();
+        if(!isVoice) appendBubble(text, 'user');
+        document.getElementById('c-status').innerText = "你: " + text;
+        try {
+            const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, history: chatHistory }) });
+            const data = await res.json();
+            if (data.reply) {
+                chatHistory.push({role:"user", content:text}, {role:"assistant", content:data.reply});
+                appendBubble(data.reply, 'bot');
+                vvrTalk(data.reply);
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    function vvrTalk(text) {
+        const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
+        const utter = new SpeechSynthesisUtterance(clean);
+        utter.lang = 'en-US';
+        utter.onstart = () => { document.getElementById('v-ava').classList.add('speaking'); document.getElementById('c-status').innerText = "VVR: " + text; if(recognition) try{recognition.stop()}catch(e){} };
+        utter.onend = () => { document.getElementById('v-ava').classList.remove('speaking'); if(callActive) setTimeout(()=>recognition.start(), 500); };
+        synth.speak(utter);
+    }
+
+    // --- UI 基础逻辑 ---
+    window.setTab = (t) => {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById('p-'+t).classList.add('active');
+        document.getElementById('t-'+t).classList.add('active');
+        if(t === 'board') syncBoard();
+    };
+
+    window.sendTextChat = () => { const i = document.getElementById('chat-in'); if(i.value.trim()){ processAction(i.value.trim(), false); i.value=""; } };
+    
+    function appendBubble(t, c) { 
+        const l = document.getElementById('chat-list'); 
+        const d = document.createElement('div'); d.className=`bubble ${c}`; d.innerText=t; 
+        l.appendChild(d); l.scrollTop = l.scrollHeight; 
+    }
+});
 </script>
 </body>
 </html>
