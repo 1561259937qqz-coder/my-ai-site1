@@ -2,40 +2,29 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR Pure Voice</title>
+  <title>VVR Pure Voice - Fixed</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
     body { margin: 0; font-family: -apple-system, sans-serif; background: #0a0a0a; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 50px 0; box-sizing: border-box; }
-    
-    /* 视觉反馈 */
-    .avatar-wrapper { position: relative; width: 160px; height: 160px; }
-    .avatar { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 65px; border: 4px solid #222; transition: 0.4s; z-index: 2; position: relative; }
+    .avatar { width: 160px; height: 160px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 65px; border: 4px solid #222; transition: 0.4s; }
     .vvr-speaking { border-color: #ff6b81; box-shadow: 0 0 40px rgba(255, 107, 129, 0.4); }
     .user-speaking { border-color: #34c759; box-shadow: 0 0 40px rgba(52, 199, 89, 0.4); }
-
-    #info { text-align: center; }
-    #status-msg { color: #666; margin-top: 15px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
-    #transcript { padding: 0 40px; text-align: center; color: #999; font-size: 16px; line-height: 1.6; max-width: 85%; flex-grow: 1; display: flex; align-items: center; font-style: italic; }
-
-    /* 控制布局 */
+    #status-msg { color: #666; margin-top: 15px; font-size: 14px; letter-spacing: 1px; }
+    #transcript { padding: 0 40px; text-align: center; color: #999; font-size: 16px; line-height: 1.6; flex-grow: 1; display: flex; align-items: center; font-style: italic; }
     .controls { display: flex; flex-direction: column; gap: 25px; width: 100%; align-items: center; }
     .btn { border: none; cursor: pointer; transition: 0.2s; color: white; display: flex; align-items: center; justify-content: center; }
     .btn:active { transform: scale(0.92); }
-    
-    .btn-action { width: 200px; height: 55px; border-radius: 30px; font-size: 16px; font-weight: 600; background: #5856d6; box-shadow: 0 4px 15px rgba(88, 86, 214, 0.2); }
+    .btn-action { width: 200px; height: 55px; border-radius: 30px; font-size: 16px; font-weight: 600; background: #5856d6; }
     .btn-main { width: 80px; height: 80px; border-radius: 50%; font-size: 32px; }
-    
     .call { background: #34c759; }
     .hangup { background: #ff3b30; }
-    .disabled { background: #222 !important; color: #444 !important; cursor: not-allowed; box-shadow: none; }
+    .disabled { background: #222 !important; color: #444 !important; cursor: not-allowed; }
   </style>
 </head>
 <body>
 
   <div id="info">
-    <div class="avatar-wrapper">
-        <div id="v-avatar" class="avatar">V</div>
-    </div>
+    <div id="v-avatar" class="avatar">V</div>
     <div id="status-msg">准备通话</div>
   </div>
 
@@ -43,10 +32,9 @@
 
   <div class="controls">
     <button id="intBtn" class="btn btn-action disabled" onclick="manualInterrupt()" disabled>暂停并让我说话</button>
-    
     <div style="display:flex; gap:30px;">
       <button id="startBtn" class="btn btn-main call" onclick="startCall()">📞</button>
-      <button id="endBtn" class="btn btn-main hangup" style="display:none;" onclick="location.reload()">❌</button>
+      <button id="endBtn" class="btn btn-main hangup" style="display:none;" onclick="hangUp()">❌</button>
     </div>
   </div>
 
@@ -56,7 +44,6 @@ let isCallActive = false;
 let history = [];
 const synth = window.speechSynthesis;
 
-// 初始化语音识别
 function initVoice() {
     const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Speech) return alert("请使用 Safari 或 Chrome 访问");
@@ -64,7 +51,6 @@ function initVoice() {
     rec.lang = 'en-US'; 
     rec.continuous = false;
     rec.interimResults = false;
-
     rec.onstart = () => updateUI('user');
     rec.onresult = (e) => sendMsg(e.results[0][0].transcript);
     rec.onend = () => { if (isCallActive && !synth.speaking) updateUI('idle'); };
@@ -77,29 +63,44 @@ function startCall() {
     document.getElementById('endBtn').style.display = 'flex';
     document.getElementById('intBtn').classList.remove('disabled');
     document.getElementById('intBtn').disabled = false;
-    
-    // 解锁音频
     synth.speak(new SpeechSynthesisUtterance(""));
-    vvrTalk("Hello! VVR is ready. I've been waiting for your call!");
+    vvrTalk("Hello! VVR is ready. I'm so glad you called!");
 }
 
-// 【插嘴功能】
+// 【关键：挂断逻辑】
+function hangUp() {
+    isCallActive = false;
+    
+    // 1. 立即停止所有正在播放和排队的语音
+    if (synth) {
+        synth.cancel(); 
+    }
+    
+    // 2. 停止麦克风录音
+    if (rec) {
+        try { rec.stop(); } catch(e) {}
+    }
+    
+    // 3. 彻底刷新页面重置状态
+    setTimeout(() => {
+        location.reload();
+    }, 100);
+}
+
 function manualInterrupt() {
     if (!isCallActive) return;
-    if (synth.speaking) synth.cancel();
-    
+    if (synth.speaking) synth.cancel(); // 插嘴时也调用 cancel
     try {
         rec.stop();
-        setTimeout(() => rec.start(), 250); // 稍微延迟防止切换杂音
+        setTimeout(() => rec.start(), 250);
     } catch(e) { rec.start(); }
-    
     document.getElementById('transcript').innerText = "请讲，我在听...";
 }
 
 async function sendMsg(text) {
+    if(!isCallActive) return;
     document.getElementById('transcript').innerText = "你: " + text;
     updateUI('thinking');
-
     try {
         const res = await fetch("/api/chat", {
             method: "POST",
@@ -107,7 +108,7 @@ async function sendMsg(text) {
             body: JSON.stringify({ message: text, history: history })
         });
         const data = await res.json();
-        if (data.reply) {
+        if (data.reply && isCallActive) {
             history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
             vvrTalk(data.reply);
         }
@@ -117,33 +118,27 @@ async function sendMsg(text) {
 }
 
 function vvrTalk(text) {
-    // 【核心改进】过滤 Emoji 和特殊字符
-    // 1. 移除 Emoji 
-    // 2. 移除常见的 markdown 符号、特殊字符（如 * _ # ~ [ ] ( ) 等）
+    if(!isCallActive) return;
+
+    // 过滤 Emoji 和特殊排版字符
     const cleanText = text
         .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-        .replace(/[*_#~`[\]()<>\\|{}]/g, ' ') // 把字符替换为空格，保持语感停顿
+        .replace(/[*_#~`[\]()<>\\|{}]/g, ' ')
         .trim();
 
     const utter = new SpeechSynthesisUtterance(cleanText);
     utter.lang = 'en-US';
-    utter.rate = 1.0;
-    utter.pitch = 1.1;
-
     utter.onstart = () => {
         updateUI('vvr');
-        document.getElementById('transcript').innerText = "VVR: " + text; // 界面依然显示完整带表情的文本
-        try { rec.stop(); } catch(e) {} // AI 说话时关麦
+        document.getElementById('transcript').innerText = "VVR: " + text;
+        try { rec.stop(); } catch(e) {} 
     };
-
     utter.onend = () => {
         if (isCallActive) {
             updateUI('idle');
-            // AI 说完后延迟自动开启录音，或者你可以删掉这行，完全靠“插嘴”按钮手动开启
-            setTimeout(() => { if(!synth.speaking) rec.start(); }, 500);
+            setTimeout(() => { if(!synth.speaking && isCallActive) rec.start(); }, 500);
         }
     };
-
     synth.speak(utter);
 }
 
@@ -151,17 +146,10 @@ function updateUI(state) {
     const av = document.getElementById('v-avatar');
     const msg = document.getElementById('status-msg');
     av.className = "avatar";
-    if (state === 'vvr') {
-        av.classList.add('vvr-speaking');
-        msg.innerText = "VVR 正在发言";
-    } else if (state === 'user') {
-        av.classList.add('user-speaking');
-        msg.innerText = "正在倾听...";
-    } else if (state === 'thinking') {
-        msg.innerText = "正在思考...";
-    } else {
-        msg.innerText = "通话中";
-    }
+    if (state === 'vvr') { av.classList.add('vvr-speaking'); msg.innerText = "VVR 正在发言"; }
+    else if (state === 'user') { av.classList.add('user-speaking'); msg.innerText = "正在倾听..."; }
+    else if (state === 'thinking') { msg.innerText = "正在思考..."; }
+    else { msg.innerText = "通话中"; }
 }
 </script>
 </body>
