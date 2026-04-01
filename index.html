@@ -137,11 +137,14 @@ let posts = [];
 
 // 登录
 function login() {
-  const name = username.value;
-  const pass = password.value;
+  const name = document.getElementById("username").value;
+  const pass = document.getElementById("password").value;
 
   const user = users.find(u => u.username === name && u.password === pass);
-  if (!user) return alert("账号或密码错误");
+  if (!user) {
+    alert("账号或密码错误");
+    return;
+  }
 
   currentUser = user;
   localStorage.setItem("user", JSON.stringify(user));
