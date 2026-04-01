@@ -2,57 +2,64 @@
 <html>
 <head>
   <title>VVR AI</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
       margin: 0;
-      font-family: "Comic Sans MS", cursive;
-      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+      font-family: Arial;
+      background: linear-gradient(135deg, #74ebd5, #acb6e5);
+    }
+
+    .center {
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
     }
 
-    #app {
-      width: 100%;
-      max-width: 500px;
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      text-align: center;
+      width: 300px;
+    }
+
+    input {
+      width: 90%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      background: #4facfe;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #chatPage {
+      display: none;
       height: 100vh;
-      display: flex;
       flex-direction: column;
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(10px);
     }
 
     #chat {
       flex: 1;
       overflow-y: auto;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .row {
-      display: flex;
-      align-items: flex-end;
-      margin: 8px 0;
-    }
-
-    .avatar {
-      width: 35px;
-      height: 35px;
-      border-radius: 50%;
-      margin: 0 8px;
+      padding: 10px;
     }
 
     .msg {
-      padding: 10px 14px;
-      border-radius: 18px;
-      max-width: 70%;
-      font-size: 14px;
-      animation: pop 0.25s ease;
+      margin: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      max-width: 60%;
     }
 
     .user {
@@ -62,120 +69,88 @@
     }
 
     .bot {
-      background: white;
-      color: #333;
+      background: #eee;
     }
 
     #inputArea {
       display: flex;
-      flex-direction: column;
       padding: 10px;
-      background: rgba(255,255,255,0.7);
-      position: sticky;
-      bottom: 0;
+      background: #ddd;
     }
 
-    #username {
-      margin-bottom: 8px;
-      padding: 8px;
-      border-radius: 15px;
-      border: none;
-      outline: none;
-    }
-
-    .inputRow {
-      display: flex;
-    }
-
-    input {
+    #inputArea input {
       flex: 1;
-      padding: 10px;
-      border-radius: 20px;
-      border: none;
-      outline: none;
-      font-size: 14px;
     }
 
-    button {
-      margin-left: 8px;
-      padding: 8px 15px;
-      background: #ff6b81;
-      border: none;
-      border-radius: 20px;
-      color: white;
-      cursor: pointer;
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
     }
 
-    @keyframes pop {
-      from {transform: scale(0.8); opacity: 0;}
-      to {transform: scale(1); opacity: 1;}
-    }
-
-    @media (min-width: 600px) {
-      #app {
-        height: 90vh;
-        border-radius: 20px;
-        overflow: hidden;
-      }
-    }
   </style>
 </head>
 
 <body>
 
-<div id="app">
+<!-- 登录页 -->
+<div id="loginPage" class="center">
+  <div class="card">
+    <h2>Login</h2>
+    <input id="username" placeholder="Enter your name" />
+    <input id="avatar" placeholder="Paste avatar URL (可选)" />
+    <button onclick="login()">Enter</button>
+  </div>
+</div>
+
+<!-- 聊天页 -->
+<div id="chatPage">
   <div id="chat"></div>
 
   <div id="inputArea">
-    <input id="username" placeholder="Enter your name..." />
-
-    <div class="inputRow">
-      <input id="input" placeholder="Talk to VVR..." />
-      <button onclick="send()">Send</button>
-    </div>
+    <input id="input" placeholder="Talk to VVR..." />
+    <button onclick="send()">Send</button>
   </div>
 </div>
 
 <script>
+  let user = null;
   let history = [];
 
-  function createMessage(text, type) {
-    const row = document.createElement("div");
-    row.className = "row";
+  function login() {
+    const name = document.getElementById("username").value;
+    let avatar = document.getElementById("avatar").value;
 
-    const avatar = document.createElement("img");
-    avatar.className = "avatar";
-
-    const msg = document.createElement("div");
-    msg.className = "msg " + type;
-    msg.innerText = text;
-
-    if (type === "bot") {
-      avatar.src = "https://api.dicebear.com/7.x/bottts/svg?seed=VVR";
-      row.appendChild(avatar);
-      row.appendChild(msg);
-    } else {
-      const username = document.getElementById("username").value || "guest";
-      avatar.src = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + username;
-
-      row.appendChild(msg);
-      row.appendChild(avatar);
-      row.style.justifyContent = "flex-end";
+    if (!name) {
+      alert("请输入名字");
+      return;
     }
 
-    document.getElementById("chat").appendChild(row);
-    row.scrollIntoView();
-    return msg;
+    if (!avatar) {
+      avatar = "https://api.dicebear.com/7.x/adventurer/png?seed=" + name;
+    }
+
+    user = { name, avatar };
+
+    localStorage.setItem("user", JSON.stringify(user));
+
+    showChat();
   }
 
-  function typeEffect(el, text) {
-    let i = 0;
-    el.innerText = "";
-    const timer = setInterval(() => {
-      el.innerText += text[i];
-      i++;
-      if (i >= text.length) clearInterval(timer);
-    }, 20);
+  function showChat() {
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("chatPage").style.display = "flex";
+
+    user = JSON.parse(localStorage.getItem("user"));
+  }
+
+  function createMessage(text, type) {
+    const div = document.createElement("div");
+    div.className = "msg " + type;
+    div.innerText = text;
+
+    document.getElementById("chat").appendChild(div);
+    div.scrollIntoView();
   }
 
   async function send() {
@@ -186,33 +161,23 @@
     createMessage(message, "user");
     input.value = "";
 
-    history.push({ role: "user", content: message });
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message, history })
+    });
 
-    const botMsg = createMessage("Thinking...", "bot");
+    const data = await res.json();
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message, history })
-      });
-
-      const data = await res.json();
-
-      history.push({ role: "assistant", content: data.reply });
-
-      typeEffect(botMsg, data.reply);
-
-    } catch (err) {
-      botMsg.innerText = "Error...";
-    }
+    createMessage(data.reply, "bot");
   }
 
-  document.getElementById("input").addEventListener("keydown", e => {
-    if (e.key === "Enter") send();
-  });
+  // 自动登录
+  if (localStorage.getItem("user")) {
+    showChat();
+  }
 </script>
 
 </body>
