@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>vvraizth AI</title>
+  <title>VVR AI</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -68,10 +68,23 @@
 
     #inputArea {
       display: flex;
+      flex-direction: column;
       padding: 10px;
       background: rgba(255,255,255,0.7);
       position: sticky;
       bottom: 0;
+    }
+
+    #username {
+      margin-bottom: 8px;
+      padding: 8px;
+      border-radius: 15px;
+      border: none;
+      outline: none;
+    }
+
+    .inputRow {
+      display: flex;
     }
 
     input {
@@ -98,7 +111,6 @@
       to {transform: scale(1); opacity: 1;}
     }
 
-    /* PC优化 */
     @media (min-width: 600px) {
       #app {
         height: 90vh;
@@ -115,8 +127,12 @@
   <div id="chat"></div>
 
   <div id="inputArea">
-    <input id="input" placeholder="Talk to your AI..." />
-    <button onclick="send()">Send</button>
+    <input id="username" placeholder="Enter your name..." />
+
+    <div class="inputRow">
+      <input id="input" placeholder="Talk to VVR..." />
+      <button onclick="send()">Send</button>
+    </div>
   </div>
 </div>
 
@@ -135,11 +151,13 @@
     msg.innerText = text;
 
     if (type === "bot") {
-      avatar.src = "https://cdn-icons-png.flaticon.com/512/4712/4712027.png";
+      avatar.src = "https://api.dicebear.com/7.x/bottts/svg?seed=VVR";
       row.appendChild(avatar);
       row.appendChild(msg);
     } else {
-      avatar.src = "https://cdn-icons-png.flaticon.com/512/847/847969.png";
+      const username = document.getElementById("username").value || "guest";
+      avatar.src = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + username;
+
       row.appendChild(msg);
       row.appendChild(avatar);
       row.style.justifyContent = "flex-end";
@@ -172,19 +190,24 @@
 
     const botMsg = createMessage("Thinking...", "bot");
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ message, history })
-    });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ message, history })
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    history.push({ role: "assistant", content: data.reply });
+      history.push({ role: "assistant", content: data.reply });
 
-    typeEffect(botMsg, data.reply);
+      typeEffect(botMsg, data.reply);
+
+    } catch (err) {
+      botMsg.innerText = "Error...";
+    }
   }
 
   document.getElementById("input").addEventListener("keydown", e => {
