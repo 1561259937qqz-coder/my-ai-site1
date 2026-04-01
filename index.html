@@ -2,42 +2,44 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR Voice Call</title>
+  <title>VVR Call - Pro Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    /* 通话界面样式 */
-    body { margin: 0; font-family: -apple-system, sans-serif; background: #1c1c1e; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #1c1c1e; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
     
-    .avatar-circle {
-      width: 140px; height: 140px; border-radius: 50%;
+    /* 呼叫界面 */
+    .avatar {
+      width: 130px; height: 130px; border-radius: 50%;
       background: linear-gradient(135deg, #ff6b81, #ff9a9e);
       display: flex; align-items: center; justify-content: center;
-      font-size: 60px; margin-bottom: 20px;
-      transition: all 0.5s ease; border: 4px solid #3a3a3c;
+      font-size: 55px; margin-bottom: 25px;
+      border: 4px solid #3a3a3c; transition: 0.4s;
     }
     
-    /* 呼叫时的呼吸灯特效 */
-    .calling { border-color: #34c759; box-shadow: 0 0 30px rgba(52, 199, 89, 0.4); animation: pulse 2s infinite; }
+    /* 接通后的动画 */
+    .active-call { border-color: #34c759; box-shadow: 0 0 30px rgba(52, 199, 89, 0.4); animation: pulse 2s infinite; }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-    #status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
-    #subtitle { font-size: 15px; color: #8e8e93; text-align: center; padding: 0 30px; line-height: 1.4; min-height: 50px; }
+    #status { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+    #subtitle { font-size: 15px; color: #8e8e93; text-align: center; padding: 0 40px; line-height: 1.5; min-height: 60px; }
 
-    .controls { position: absolute; bottom: 100px; display: flex; gap: 40px; }
-    .btn { width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-    .accept { background: #34c759; color: white; }
-    .decline { background: #ff3b30; color: white; display: none; }
+    /* 控制按钮 */
+    .controls { position: absolute; bottom: 80px; display: flex; gap: 40px; }
+    .btn { width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .btn:active { transform: scale(0.9); }
+    .start { background: #34c759; color: white; }
+    .end { background: #ff3b30; color: white; display: none; }
   </style>
 </head>
 <body>
 
-  <div id="avatar" class="avatar-circle">V</div>
+  <div id="avatar" class="avatar">V</div>
   <div id="status">VVR Call</div>
-  <div id="subtitle">准备就绪，点击下方按钮开始通话</div>
+  <div id="subtitle">准备就绪<br>建议佩戴耳机以获得最佳音质</div>
 
   <div class="controls">
-    <button id="startBtn" class="btn accept" onclick="startCall()">📞</button>
-    <button id="endBtn" class="btn decline" onclick="location.reload()">❌</button>
+    <button id="startBtn" class="btn start" onclick="handleCallStart()">📞</button>
+    <button id="endBtn" class="btn end" onclick="location.reload()">❌</button>
   </div>
 
 <script>
@@ -46,55 +48,66 @@ let isCalling = false;
 let chatHistory = [];
 const synth = window.speechSynthesis;
 
-// 初始化语音识别
-function initRecognition() {
+// 1. 初始化语音识别 (兼容 iOS/Android)
+function setupVoice() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        alert("浏览器不支持语音功能，请使用 Chrome/Edge 或通过 HTTPS 访问");
+        alert("当前浏览器不支持语音功能，请使用 Safari (iOS) 或 Chrome (Android)");
         return;
     }
     recognition = new SpeechRecognition();
-    recognition.lang = 'en-US'; // VVR 设定为英文，若需中文改为 'zh-CN'
-    recognition.continuous = false; // 采用单次识别+自动重启，安卓兼容性更好
+    recognition.lang = 'en-US'; // 根据 VVR 设定使用英文
+    recognition.continuous = false; // 采用单次识别模式以减少杂音积累
     recognition.interimResults = false;
 
     recognition.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        handleUserSpeech(text);
+        const result = event.results[0][0].transcript;
+        processTalk(result);
     };
 
     recognition.onend = () => {
-        // 如果通话还在继续，且 AI 没在说话，就重启监听
+        // 只有在通话中且 AI 没在说话时，才重新开启监听
         if (isCalling && !synth.speaking) {
             try { recognition.start(); } catch(e) {}
         }
     };
+
+    recognition.onerror = (e) => {
+        console.error("识别错误:", e.error);
+        if (e.error === 'not-allowed') alert("请允许麦克风权限");
+    };
 }
 
-// 开始通话
-async function startCall() {
-    initRecognition();
+// 2. 接通电话
+async function handleCallStart() {
+    setupVoice();
     isCalling = true;
     
-    // 切换 UI
+    // UI 更新
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('endBtn').style.display = 'flex';
-    document.getElementById('avatar').classList.add('calling');
-    document.getElementById('subtitle').innerText = "连接中...";
+    document.getElementById('avatar').classList.add('active-call');
+    document.getElementById('subtitle').innerText = "正在接通 VVR...";
 
-    // 尝试开启麦克风并打个招呼
     try {
+        // 关键：在 iOS 上需要先通过用户点击触发一次语音播放（解锁音频）
+        const unlock = new SpeechSynthesisUtterance("");
+        synth.speak(unlock);
+        
         await recognition.start();
-        speakText("Hello! VVR is here. I'm ready to talk!");
+        vvrSay("Hello! VVR is on the line. I'm ready for our conversation.");
     } catch (err) {
         console.error("启动失败", err);
     }
 }
 
-// 处理用户说的话
-async function handleUserSpeech(text) {
-    // 【打断功能】：如果用户开口，AI 立即闭嘴
+// 3. 处理对话逻辑
+async function processTalk(text) {
+    // 【打断机制】用户说话时停止 AI 播放
     if (synth.speaking) synth.cancel();
+    
+    // 【防干扰】开始思考请求时暂时关闭麦克风
+    try { recognition.stop(); } catch(e) {}
 
     document.getElementById('subtitle').innerText = "你: " + text;
     
@@ -108,37 +121,41 @@ async function handleUserSpeech(text) {
         
         if (data.reply) {
             chatHistory.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
-            speakText(data.reply);
+            vvrSay(data.reply);
         }
     } catch (e) {
-        document.getElementById('subtitle').innerText = "通话连接不稳定...";
+        document.getElementById('subtitle').innerText = "信号连接超时...";
+        if (isCalling) recognition.start();
     }
 }
 
-// AI 说话（核心：过滤表情）
-function speakText(text) {
-    // 1. 正则过滤：洗掉所有 Emoji
+// 4. AI 说话（含表情过滤与 iOS 音质优化）
+function vvrSay(text) {
+    // 过滤所有 Emoji，防止 VVR 读出“微笑脸”等词
     const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
 
-    const utter = new SpeechSynthesisUtterance(cleanText);
-    utter.lang = 'en-US';
-    utter.rate = 1.0;  // 语速
-    utter.pitch = 1.1; // 稍微调高一点点，让 VVR 听起来更可爱
+    const msg = new SpeechSynthesisUtterance(cleanText);
+    msg.lang = 'en-US';
+    msg.rate = 1.0; 
+    msg.pitch = 1.1; // 增加一点点音调，增加可爱感
 
-    utter.onstart = () => {
-        // 屏幕上依然显示带表情的原文，但 VVR 只念 cleanText
+    msg.onstart = () => {
+        // AI 说话时关闭识别，彻底杜绝回声干扰（解决电流声关键）
+        try { recognition.stop(); } catch(e) {}
         document.getElementById('subtitle').innerText = "VVR: " + text;
     };
 
-    utter.onend = () => {
-        // AI 说完话，自动重启麦克风等用户回复
+    msg.onend = () => {
         if (isCalling) {
-            try { recognition.start(); } catch(e) {}
-            document.getElementById('subtitle').innerText = "通话中，我在听...";
+            // AI 说完后延迟 300ms 再开麦克风，避开喇叭余音
+            setTimeout(() => {
+                try { recognition.start(); } catch(e) {}
+                document.getElementById('subtitle').innerText = "VVR 正在听...";
+            }, 300);
         }
     };
 
-    synth.speak(utter);
+    synth.speak(msg);
 }
 </script>
 </body>
