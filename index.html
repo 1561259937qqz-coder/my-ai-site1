@@ -1,183 +1,225 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>VVR AI</title>
+  <title>VVR World</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
       margin: 0;
       font-family: Arial;
-      background: linear-gradient(135deg, #74ebd5, #acb6e5);
+      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
     }
 
-    .center {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 15px;
-      text-align: center;
-      width: 300px;
-    }
-
-    input {
-      width: 90%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      padding: 10px 20px;
-      border: none;
-      background: #4facfe;
-      color: white;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-
-    #chatPage {
+    .page {
       display: none;
       height: 100vh;
       flex-direction: column;
     }
 
-    #chat {
+    .active {
+      display: flex;
+    }
+
+    .center {
+      justify-content: center;
+      align-items: center;
+    }
+
+    input {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 10px;
+      border: none;
+    }
+
+    button {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #ff6b81;
+      color: white;
+      cursor: pointer;
+    }
+
+    #chat, #posts {
       flex: 1;
       overflow-y: auto;
       padding: 10px;
     }
 
-    .msg {
+    .msg, .post {
+      background: white;
       margin: 10px;
       padding: 10px;
       border-radius: 10px;
-      max-width: 60%;
     }
 
-    .user {
-      background: #4facfe;
-      color: white;
-      margin-left: auto;
-    }
+    .user { background: #4facfe; color: white; }
 
-    .bot {
-      background: #eee;
-    }
-
-    #inputArea {
+    #nav {
       display: flex;
+      justify-content: space-around;
+      background: white;
       padding: 10px;
-      background: #ddd;
     }
-
-    #inputArea input {
-      flex: 1;
-    }
-
-    .avatar {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-    }
-
   </style>
 </head>
 
 <body>
 
 <!-- 登录页 -->
-<div id="loginPage" class="center">
-  <div class="card">
+<div id="loginPage" class="page active center">
+  <div>
     <h2>Login</h2>
-    <input id="username" placeholder="Enter your name" />
-    <input id="avatar" placeholder="Paste avatar URL (可选)" />
-    <button onclick="login()">Enter</button>
+    <input id="username" placeholder="username">
+    <input id="password" placeholder="password" type="password">
+    <button onclick="login()">Login</button>
   </div>
 </div>
 
-<!-- 聊天页 -->
-<div id="chatPage">
-  <div id="chat"></div>
+<!-- 主界面 -->
+<div id="mainPage" class="page">
 
-  <div id="inputArea">
-    <input id="input" placeholder="Talk to VVR..." />
+  <div id="chatPage" class="page active">
+    <div id="chat"></div>
+    <input id="chatInput" placeholder="Talk to VVR...">
     <button onclick="send()">Send</button>
   </div>
+
+  <div id="postPage" class="page">
+    <div id="posts"></div>
+    <input id="postInput" placeholder="Write something...">
+    <button onclick="addPost()">Post</button>
+  </div>
+
+  <div id="nav">
+    <button onclick="show('chatPage')">Chat</button>
+    <button onclick="show('postPage')">Community</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+
 </div>
 
 <script>
-  let user = null;
-  let history = [];
+const users = [
+  { username: "user1", password: "123" },
+  { username: "user2", password: "456" }
+];
 
-  function login() {
-    const name = document.getElementById("username").value;
-    let avatar = document.getElementById("avatar").value;
+let currentUser = null;
+let history = [];
+let posts = JSON.parse(localStorage.getItem("posts") || "[]");
 
-    if (!name) {
-      alert("请输入名字");
-      return;
-    }
+function login() {
+  const name = username.value;
+  const pass = password.value;
 
-    if (!avatar) {
-      avatar = "https://api.dicebear.com/7.x/adventurer/png?seed=" + name;
-    }
+  const user = users.find(u => u.username === name && u.password === pass);
+  if (!user) return alert("wrong");
 
-    user = { name, avatar };
+  user.avatar = "https://api.dicebear.com/7.x/adventurer/png?seed=" + name;
 
-    localStorage.setItem("user", JSON.stringify(user));
+  localStorage.setItem("user", JSON.stringify(user));
+  currentUser = user;
 
-    showChat();
-  }
+  showMain();
+}
 
-  function showChat() {
-    document.getElementById("loginPage").style.display = "none";
-    document.getElementById("chatPage").style.display = "flex";
+function showMain() {
+  loginPage.classList.remove("active");
+  mainPage.classList.add("active");
+  renderPosts();
+}
 
-    user = JSON.parse(localStorage.getItem("user"));
-  }
+function logout() {
+  localStorage.removeItem("user");
+  location.reload();
+}
 
-  function createMessage(text, type) {
-    const div = document.createElement("div");
-    div.className = "msg " + type;
-    div.innerText = text;
+function show(page) {
+  chatPage.classList.remove("active");
+  postPage.classList.remove("active");
+  document.getElementById(page).classList.add("active");
+}
 
-    document.getElementById("chat").appendChild(div);
-    div.scrollIntoView();
-  }
+function createMsg(text, cls) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.innerText = text;
+  chat.appendChild(div);
+}
 
-  async function send() {
-    const input = document.getElementById("input");
-    const message = input.value;
-    if (!message) return;
+async function send() {
+  const msg = chatInput.value;
+  if (!msg) return;
 
-    createMessage(message, "user");
-    input.value = "";
+  createMsg(msg, "user");
+  chatInput.value = "";
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ message, history })
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ message: msg, history })
+  });
+
+  const data = await res.json();
+  createMsg(data.reply, "bot");
+}
+
+function addPost() {
+  const text = postInput.value;
+  if (!text) return;
+
+  posts.push({
+    user: currentUser.username,
+    text,
+    comments: []
+  });
+
+  localStorage.setItem("posts", JSON.stringify(posts));
+  postInput.value = "";
+  renderPosts();
+}
+
+function addComment(i) {
+  const input = document.getElementById("c"+i);
+  posts[i].comments.push({
+    user: currentUser.username,
+    text: input.value
+  });
+
+  localStorage.setItem("posts", JSON.stringify(posts));
+  renderPosts();
+}
+
+function renderPosts() {
+  postsDiv = document.getElementById("posts");
+  postsDiv.innerHTML = "";
+
+  posts.forEach((p,i)=>{
+    let html = `<div class="post">
+      <b>${p.user}</b><br>${p.text}<br>
+      <input id="c${i}" placeholder="comment">
+      <button onclick="addComment(${i})">send</button>
+      <div>`;
+
+    p.comments.forEach(c=>{
+      html += `<p>${c.user}: ${c.text}</p>`;
     });
 
-    const data = await res.json();
+    html += "</div></div>";
 
-    createMessage(data.reply, "bot");
-  }
+    postsDiv.innerHTML += html;
+  });
+}
 
-  // 自动登录
-  if (localStorage.getItem("user")) {
-    showChat();
-  }
+// 自动登录
+const saved = localStorage.getItem("user");
+if (saved) {
+  currentUser = JSON.parse(saved);
+  showMain();
+}
 </script>
 
 </body>
