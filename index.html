@@ -2,154 +2,210 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR Pure Voice - Fixed</title>
+  <title>VVR World - Professional</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    body { margin: 0; font-family: -apple-system, sans-serif; background: #0a0a0a; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 50px 0; box-sizing: border-box; }
-    .avatar { width: 160px; height: 160px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 65px; border: 4px solid #222; transition: 0.4s; }
-    .vvr-speaking { border-color: #ff6b81; box-shadow: 0 0 40px rgba(255, 107, 129, 0.4); }
-    .user-speaking { border-color: #34c759; box-shadow: 0 0 40px rgba(52, 199, 89, 0.4); }
-    #status-msg { color: #666; margin-top: 15px; font-size: 14px; letter-spacing: 1px; }
-    #transcript { padding: 0 40px; text-align: center; color: #999; font-size: 16px; line-height: 1.6; flex-grow: 1; display: flex; align-items: center; font-style: italic; }
-    .controls { display: flex; flex-direction: column; gap: 25px; width: 100%; align-items: center; }
-    .btn { border: none; cursor: pointer; transition: 0.2s; color: white; display: flex; align-items: center; justify-content: center; }
-    .btn:active { transform: scale(0.92); }
-    .btn-action { width: 200px; height: 55px; border-radius: 30px; font-size: 16px; font-weight: 600; background: #5856d6; }
-    .btn-main { width: 80px; height: 80px; border-radius: 50%; font-size: 32px; }
-    .call { background: #34c759; }
-    .hangup { background: #ff3b30; }
-    .disabled { background: #222 !important; color: #444 !important; cursor: not-allowed; }
+    :root { --primary: #667eea; --accent: #ff6b81; --bg: #0a0a0a; --card: #1a1a1a; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    
+    /* 登录遮罩层 */
+    #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+    .login-box { background: var(--card); padding: 30px; border-radius: 20px; width: 80%; max-width: 320px; text-align: center; border: 1px solid #333; }
+    .login-box input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #444; background: #222; color: white; box-sizing: border-box; }
+    .login-box button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+    /* 顶部导航 */
+    nav { display: flex; justify-content: space-around; background: var(--card); padding: 15px 0; border-bottom: 1px solid #333; }
+    nav button { background: none; border: none; color: #888; font-size: 14px; font-weight: bold; cursor: pointer; }
+    nav button.active { color: var(--primary); transform: scale(1.1); }
+
+    .page { display: none; flex: 1; flex-direction: column; height: 100%; overflow: hidden; animation: fadeIn 0.3s; }
+    .page.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* 通话界面 */
+    .call-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .avatar { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #764ba2); display: flex; align-items: center; justify-content: center; font-size: 60px; border: 4px solid #222; margin-bottom: 20px; transition: 0.4s; }
+    .vvr-active { border-color: var(--accent); box-shadow: 0 0 30px rgba(255, 107, 129, 0.4); animation: breathe 2s infinite; }
+    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+    /* 列表区域 (聊天/留言) */
+    .list-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { padding: 10px 16px; border-radius: 18px; max-width: 80%; font-size: 15px; }
+    .user-msg { background: var(--primary); align-self: flex-end; }
+    .bot-msg { background: #262626; align-self: flex-start; border: 1px solid #333; }
+    
+    .input-bar { padding: 15px; background: var(--card); display: flex; gap: 10px; }
+    .input-bar input { flex: 1; background: #2a2a2a; border: none; padding: 12px; border-radius: 20px; color: white; outline: none; }
+    .input-bar button { background: var(--primary); border: none; padding: 0 20px; border-radius: 20px; color: white; }
+
+    /* 留言板卡片 */
+    .board-card { background: var(--card); padding: 15px; border-radius: 12px; border-left: 4px solid var(--accent); }
+    .board-user { font-size: 12px; color: var(--accent); margin-bottom: 5px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <div id="info">
-    <div id="v-avatar" class="avatar">V</div>
-    <div id="status-msg">准备通话</div>
+<div id="login-overlay">
+  <div class="login-box">
+    <h2 style="margin-top:0;">Welcome</h2>
+    <input type="text" id="usernameInput" placeholder="请输入用户名 (xiaola/vvr...)">
+    <button onclick="doLogin()">进入 VVR 世界</button>
   </div>
+</div>
 
-  <div id="transcript">点击绿色按钮接听 VVR 的来电</div>
+<nav>
+  <button onclick="showPage('callPage')" id="btn-callPage" class="active">语音通话</button>
+  <button onclick="showPage('chatPage')" id="btn-chatPage">文字聊天</button>
+  <button onclick="showPage('boardPage')" id="btn-boardPage">留言板</button>
+</nav>
 
-  <div class="controls">
-    <button id="intBtn" class="btn btn-action disabled" onclick="manualInterrupt()" disabled>暂停并让我说话</button>
+<div id="callPage" class="page active">
+  <div class="call-content">
+    <div id="v-avatar" class="avatar">V</div>
+    <div id="call-sub" style="color:#888; font-style:italic;">未连接</div>
+  </div>
+  <div style="padding-bottom:50px; display:flex; flex-direction:column; align-items:center; gap:15px;">
+    <button id="intBtn" style="background:#5856d6; color:white; border:none; padding:10px 25px; border-radius:20px; display:none;" onclick="manualInterrupt()">插嘴/我要说话</button>
     <div style="display:flex; gap:30px;">
-      <button id="startBtn" class="btn btn-main call" onclick="startCall()">📞</button>
-      <button id="endBtn" class="btn btn-main hangup" style="display:none;" onclick="hangUp()">❌</button>
+      <button id="startCallBtn" onclick="startCall()" style="width:70px;height:70px;border-radius:50%;background:#34c759;border:none;font-size:30px;">📞</button>
+      <button id="endCallBtn" onclick="location.reload()" style="width:70px;height:70px;border-radius:50%;background:#ff3b30;border:none;font-size:30px;display:none;">❌</button>
     </div>
   </div>
+</div>
+
+<div id="chatPage" class="page">
+  <div id="chat-list" class="list-area"></div>
+  <div class="input-bar">
+    <input id="chatInput" placeholder="发消息给 VVR...">
+    <button onclick="sendChat()">发送</button>
+  </div>
+</div>
+
+<div id="boardPage" class="page">
+  <div id="board-list" class="list-area"></div>
+  <div class="input-bar">
+    <input id="boardInput" placeholder="留下你的脚印...">
+    <button onclick="sendBoard()" style="background:var(--accent)">发布</button>
+  </div>
+</div>
 
 <script>
-let rec;
-let isCallActive = false;
-let history = [];
+let currentUser = "";
+let isCalling = false;
+let chatHistory = [];
 const synth = window.speechSynthesis;
+let rec;
 
+// --- 1. 登录逻辑 ---
+function doLogin() {
+    const user = document.getElementById('usernameInput').value.trim();
+    if(!user) return alert("请输入用户名");
+    currentUser = user;
+    document.getElementById('login-overlay').style.display = 'none';
+    // 初始欢迎消息
+    appendChat(`你好，${currentUser}！我是 VVR，很高兴见到你。`, 'bot-msg');
+}
+
+// --- 2. 页面切换 ---
+function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.getElementById('btn-'+id).classList.add('active');
+}
+
+// --- 3. 语音通话核心 ---
 function initVoice() {
     const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Speech) return alert("请使用 Safari 或 Chrome 访问");
+    if(!Speech) return alert("浏览器不支持语音");
     rec = new Speech();
-    rec.lang = 'en-US'; 
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onstart = () => updateUI('user');
-    rec.onresult = (e) => sendMsg(e.results[0][0].transcript);
-    rec.onend = () => { if (isCallActive && !synth.speaking) updateUI('idle'); };
+    rec.lang = 'en-US';
+    rec.onresult = (e) => handleInput(e.results[0][0].transcript, true);
+    rec.onend = () => { if(isCalling && !synth.speaking) rec.start(); };
 }
 
 function startCall() {
     initVoice();
-    isCallActive = true;
-    document.getElementById('startBtn').style.display = 'none';
-    document.getElementById('endBtn').style.display = 'flex';
-    document.getElementById('intBtn').classList.remove('disabled');
-    document.getElementById('intBtn').disabled = false;
-    synth.speak(new SpeechSynthesisUtterance(""));
-    vvrTalk("Hello! VVR is ready. I'm so glad you called!");
-}
-
-// 【关键：挂断逻辑】
-function hangUp() {
-    isCallActive = false;
-    
-    // 1. 立即停止所有正在播放和排队的语音
-    if (synth) {
-        synth.cancel(); 
-    }
-    
-    // 2. 停止麦克风录音
-    if (rec) {
-        try { rec.stop(); } catch(e) {}
-    }
-    
-    // 3. 彻底刷新页面重置状态
-    setTimeout(() => {
-        location.reload();
-    }, 100);
+    isCalling = true;
+    document.getElementById('startCallBtn').style.display = 'none';
+    document.getElementById('endCallBtn').style.display = 'flex';
+    document.getElementById('intBtn').style.display = 'block';
+    synth.speak(new SpeechSynthesisUtterance("")); // 解锁
+    vvrTalk(`Hello ${currentUser}, VVR is here. I'm listening.`);
 }
 
 function manualInterrupt() {
-    if (!isCallActive) return;
-    if (synth.speaking) synth.cancel(); // 插嘴时也调用 cancel
-    try {
-        rec.stop();
-        setTimeout(() => rec.start(), 250);
-    } catch(e) { rec.start(); }
-    document.getElementById('transcript').innerText = "请讲，我在听...";
+    if(synth.speaking) synth.cancel();
+    try { rec.stop(); setTimeout(() => rec.start(), 300); } catch(e) { rec.start(); }
 }
 
-async function sendMsg(text) {
-    if(!isCallActive) return;
-    document.getElementById('transcript').innerText = "你: " + text;
-    updateUI('thinking');
+// --- 4. 统一处理输入 (文字或语音) ---
+async function handleInput(text, isVoice) {
+    if(isVoice && synth.speaking) synth.cancel();
+    if(!isVoice) appendChat(text, 'user-msg');
+    document.getElementById('call-sub').innerText = "你: " + text;
+
     try {
         const res = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text, history: history })
+            body: JSON.stringify({ message: text, history: chatHistory, user: currentUser })
         });
         const data = await res.json();
-        if (data.reply && isCallActive) {
-            history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
+        if (data.reply) {
+            chatHistory.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
+            appendChat(data.reply, 'bot-msg');
             vvrTalk(data.reply);
         }
-    } catch (e) {
-        document.getElementById('status-msg').innerText = "连接异常";
-    }
+    } catch (e) { console.error(e); }
 }
 
 function vvrTalk(text) {
-    if(!isCallActive) return;
+    // 过滤表情和字符
+    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+                      .replace(/[*_#~`[\]()<>\\|{}]/g, ' ').trim();
 
-    // 过滤 Emoji 和特殊排版字符
-    const cleanText = text
-        .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-        .replace(/[*_#~`[\]()<>\\|{}]/g, ' ')
-        .trim();
-
-    const utter = new SpeechSynthesisUtterance(cleanText);
+    const utter = new SpeechSynthesisUtterance(clean);
     utter.lang = 'en-US';
     utter.onstart = () => {
-        updateUI('vvr');
-        document.getElementById('transcript').innerText = "VVR: " + text;
-        try { rec.stop(); } catch(e) {} 
+        document.getElementById('v-avatar').classList.add('vvr-active');
+        document.getElementById('call-sub').innerText = "VVR: " + text;
+        if(rec) try { rec.stop(); } catch(e) {}
     };
     utter.onend = () => {
-        if (isCallActive) {
-            updateUI('idle');
-            setTimeout(() => { if(!synth.speaking && isCallActive) rec.start(); }, 500);
-        }
+        document.getElementById('v-avatar').classList.remove('vvr-active');
+        if(isCalling) setTimeout(() => { if(!synth.speaking) rec.start(); }, 500);
     };
     synth.speak(utter);
 }
 
-function updateUI(state) {
-    const av = document.getElementById('v-avatar');
-    const msg = document.getElementById('status-msg');
-    av.className = "avatar";
-    if (state === 'vvr') { av.classList.add('vvr-speaking'); msg.innerText = "VVR 正在发言"; }
-    else if (state === 'user') { av.classList.add('user-speaking'); msg.innerText = "正在倾听..."; }
-    else if (state === 'thinking') { msg.innerText = "正在思考..."; }
-    else { msg.innerText = "通话中"; }
+// --- 5. 聊天 & 留言板 UI 交互 ---
+function sendChat() {
+    const input = document.getElementById('chatInput');
+    if(!input.value.trim()) return;
+    handleInput(input.value.trim(), false);
+    input.value = "";
+}
+
+function appendChat(text, cls) {
+    const list = document.getElementById('chat-list');
+    const d = document.createElement('div');
+    d.className = "msg " + cls;
+    d.innerText = text;
+    list.appendChild(d);
+    list.scrollTop = list.scrollHeight;
+}
+
+function sendBoard() {
+    const input = document.getElementById('boardInput');
+    if(!input.value.trim()) return;
+    const list = document.getElementById('board-list');
+    const d = document.createElement('div');
+    d.className = "board-card";
+    d.innerHTML = `<div class="board-user">@${currentUser}</div><div>${input.value}</div>`;
+    list.prepend(d); // 最新的留言放上面
+    input.value = "";
 }
 </script>
 </body>
