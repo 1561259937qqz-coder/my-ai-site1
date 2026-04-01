@@ -2,95 +2,102 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR Call Center</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>VVR Voice Call</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    body { margin: 0; font-family: sans-serif; background: #1c1c1e; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .status-circle { width: 150px; height: 150px; border-radius: 50%; background: #2c2c2e; display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 30px; transition: 0.5s; border: 4px solid #3a3a3c; }
-    .calling { border-color: #34c759; box-shadow: 0 0 20px #34c759; animation: pulse 2s infinite; }
+    /* 通话界面样式 */
+    body { margin: 0; font-family: -apple-system, sans-serif; background: #1c1c1e; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    
+    .avatar-circle {
+      width: 140px; height: 140px; border-radius: 50%;
+      background: linear-gradient(135deg, #ff6b81, #ff9a9e);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 60px; margin-bottom: 20px;
+      transition: all 0.5s ease; border: 4px solid #3a3a3c;
+    }
+    
+    /* 呼叫时的呼吸灯特效 */
+    .calling { border-color: #34c759; box-shadow: 0 0 30px rgba(52, 199, 89, 0.4); animation: pulse 2s infinite; }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-    #info { font-size: 24px; margin-bottom: 10px; }
-    #sub { font-size: 16px; color: #8e8e93; text-align: center; padding: 0 20px; min-height: 40px; }
-    .btn-group { position: absolute; bottom: 80px; display: flex; gap: 30px; }
-    .phone-btn { width: 70px; height: 70px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px; display: flex; align-items: center; justify-content: center; }
-    .start { background: #34c759; color: white; }
-    .stop { background: #ff3b30; color: white; display: none; }
+
+    #status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
+    #subtitle { font-size: 15px; color: #8e8e93; text-align: center; padding: 0 30px; line-height: 1.4; min-height: 50px; }
+
+    .controls { position: absolute; bottom: 100px; display: flex; gap: 40px; }
+    .btn { width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+    .accept { background: #34c759; color: white; }
+    .decline { background: #ff3b30; color: white; display: none; }
   </style>
 </head>
 <body>
 
-  <div id="circle" class="status-circle">V</div>
-  <div id="info">VVR Call</div>
-  <div id="sub">准备就绪，请点击接听</div>
+  <div id="avatar" class="avatar-circle">V</div>
+  <div id="status">VVR Call</div>
+  <div id="subtitle">准备就绪，点击下方按钮开始通话</div>
 
-  <div class="btn-group">
-    <button id="startBtn" class="phone-btn start" onclick="initCall()">📞</button>
-    <button id="stopBtn" class="phone-btn stop" onclick="location.reload()">❌</button>
+  <div class="controls">
+    <button id="startBtn" class="btn accept" onclick="startCall()">📞</button>
+    <button id="endBtn" class="btn decline" onclick="location.reload()">❌</button>
   </div>
 
 <script>
 let recognition;
-let isCallActive = false;
+let isCalling = false;
 let chatHistory = [];
 const synth = window.speechSynthesis;
 
-// 1. 初始化语音识别
-function setupRecognition() {
+// 初始化语音识别
+function initRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        alert("您的浏览器不支持语音通话，请使用 Chrome 或 Edge");
+        alert("浏览器不支持语音功能，请使用 Chrome/Edge 或通过 HTTPS 访问");
         return;
     }
     recognition = new SpeechRecognition();
-    recognition.lang = 'en-US'; // 如果想说中文改为 'zh-CN'
-    recognition.continuous = true;
+    recognition.lang = 'en-US'; // VVR 设定为英文，若需中文改为 'zh-CN'
+    recognition.continuous = false; // 采用单次识别+自动重启，安卓兼容性更好
     recognition.interimResults = false;
 
-    // 当识别到声音时
     recognition.onresult = (event) => {
-        const text = event.results[event.results.length - 1][0].transcript;
-        console.log("识别到:", text);
-        handleTalk(text);
+        const text = event.results[0][0].transcript;
+        handleUserSpeech(text);
     };
 
-    // 自动重连逻辑：确保麦克风一直开着
     recognition.onend = () => {
-        if (isCallActive) recognition.start();
-    };
-
-    recognition.onerror = (e) => {
-        console.error("麦克风错误:", e.error);
-        if (e.error === 'not-allowed') alert("请在浏览器设置中允许麦克风权限！");
+        // 如果通话还在继续，且 AI 没在说话，就重启监听
+        if (isCalling && !synth.speaking) {
+            try { recognition.start(); } catch(e) {}
+        }
     };
 }
 
-// 2. 接通电话
-async function initCall() {
-    setupRecognition();
-    isCallActive = true;
+// 开始通话
+async function startCall() {
+    initRecognition();
+    isCalling = true;
     
-    // UI 变换
+    // 切换 UI
     document.getElementById('startBtn').style.display = 'none';
-    document.getElementById('stopBtn').style.display = 'flex';
-    document.getElementById('circle').classList.add('calling');
-    document.getElementById('sub').innerText = "正在连接 VVR...";
+    document.getElementById('endBtn').style.display = 'flex';
+    document.getElementById('avatar').classList.add('calling');
+    document.getElementById('subtitle').innerText = "连接中...";
 
-    // 启动麦克风
+    // 尝试开启麦克风并打个招呼
     try {
         await recognition.start();
-        vvrSpeak("Hello, VVR is online. I'm listening.");
-    } catch (e) {
-        console.log("启动失败", e);
+        speakText("Hello! VVR is here. I'm ready to talk!");
+    } catch (err) {
+        console.error("启动失败", err);
     }
 }
 
-// 3. 处理对话
-async function handleTalk(text) {
-    // 打断机制
+// 处理用户说的话
+async function handleUserSpeech(text) {
+    // 【打断功能】：如果用户开口，AI 立即闭嘴
     if (synth.speaking) synth.cancel();
 
-    document.getElementById('sub').innerText = "你: " + text;
-
+    document.getElementById('subtitle').innerText = "你: " + text;
+    
     try {
         const res = await fetch("/api/chat", {
             method: "POST",
@@ -98,22 +105,39 @@ async function handleTalk(text) {
             body: JSON.stringify({ message: text, history: chatHistory })
         });
         const data = await res.json();
+        
         if (data.reply) {
             chatHistory.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
-            vvrSpeak(data.reply);
+            speakText(data.reply);
         }
     } catch (e) {
-        document.getElementById('sub').innerText = "连接超时";
+        document.getElementById('subtitle').innerText = "通话连接不稳定...";
     }
 }
 
-// 4. AI 发声
-function vvrSpeak(text) {
-    const utter = new SpeechSynthesisUtterance(text);
+// AI 说话（核心：过滤表情）
+function speakText(text) {
+    // 1. 正则过滤：洗掉所有 Emoji
+    const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+
+    const utter = new SpeechSynthesisUtterance(cleanText);
     utter.lang = 'en-US';
+    utter.rate = 1.0;  // 语速
+    utter.pitch = 1.1; // 稍微调高一点点，让 VVR 听起来更可爱
+
     utter.onstart = () => {
-        document.getElementById('sub').innerText = "VVR: " + text;
+        // 屏幕上依然显示带表情的原文，但 VVR 只念 cleanText
+        document.getElementById('subtitle').innerText = "VVR: " + text;
     };
+
+    utter.onend = () => {
+        // AI 说完话，自动重启麦克风等用户回复
+        if (isCalling) {
+            try { recognition.start(); } catch(e) {}
+            document.getElementById('subtitle').innerText = "通话中，我在听...";
+        }
+    };
+
     synth.speak(utter);
 }
 </script>
