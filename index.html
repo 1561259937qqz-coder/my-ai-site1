@@ -2,160 +2,183 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR Call - Pro Edition</title>
+  <title>VVR Control Call</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #1c1c1e; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: #121212; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 0; box-sizing: border-box; }
     
-    /* 呼叫界面 */
-    .avatar {
-      width: 130px; height: 130px; border-radius: 50%;
-      background: linear-gradient(135deg, #ff6b81, #ff9a9e);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 55px; margin-bottom: 25px;
-      border: 4px solid #3a3a3c; transition: 0.4s;
-    }
+    /* 状态显示 */
+    .avatar { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, #6e8efb, #a777e3); display: flex; align-items: center; justify-content: center; font-size: 60px; transition: 0.5s; border: 4px solid #333; }
+    .vvr-speaking { border-color: #ff6b81; box-shadow: 0 0 30px rgba(255, 107, 129, 0.4); }
+    .user-speaking { border-color: #34c759; box-shadow: 0 0 30px rgba(52, 199, 89, 0.4); }
+
+    #info { text-align: center; }
+    #info h1 { margin: 0; font-size: 26px; }
+    #status-msg { color: #888; margin-top: 10px; font-size: 14px; height: 20px; }
+    #transcript { padding: 0 30px; text-align: center; color: #ccc; font-size: 15px; line-height: 1.6; max-width: 80%; flex-grow: 1; display: flex; align-items: center; }
+
+    /* 按钮区域 */
+    .controls { display: flex; flex-direction: column; gap: 20px; width: 100%; align-items: center; }
+    .row { display: flex; gap: 30px; }
     
-    /* 接通后的动画 */
-    .active-call { border-color: #34c759; box-shadow: 0 0 30px rgba(52, 199, 89, 0.4); animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-    #status { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
-    #subtitle { font-size: 15px; color: #8e8e93; text-align: center; padding: 0 40px; line-height: 1.5; min-height: 60px; }
-
-    /* 控制按钮 */
-    .controls { position: absolute; bottom: 80px; display: flex; gap: 40px; }
-    .btn { width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .btn { border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: white; }
     .btn:active { transform: scale(0.9); }
-    .start { background: #34c759; color: white; }
-    .end { background: #ff3b30; color: white; display: none; }
+    
+    .btn-main { width: 80px; height: 80px; font-size: 30px; }
+    .btn-action { width: 160px; height: 50px; border-radius: 25px; font-size: 16px; font-weight: bold; }
+
+    .call { background: #34c759; }
+    .hangup { background: #ff3b30; }
+    .interrupt { background: #5856d6; box-shadow: 0 4px 15px rgba(88, 86, 214, 0.3); }
+    .disabled { background: #333 !important; color: #666; cursor: not-allowed; box-shadow: none; }
   </style>
 </head>
 <body>
 
-  <div id="avatar" class="avatar">V</div>
-  <div id="status">VVR Call</div>
-  <div id="subtitle">准备就绪<br>建议佩戴耳机以获得最佳音质</div>
+  <div id="info">
+    <div id="v-avatar" class="avatar">V</div>
+    <h1 style="margin-top:20px;">VVR</h1>
+    <div id="status-msg">已准备好通话</div>
+  </div>
+
+  <div id="transcript">建议佩戴耳机获得最佳通话效果</div>
 
   <div class="controls">
-    <button id="startBtn" class="btn start" onclick="handleCallStart()">📞</button>
-    <button id="endBtn" class="btn end" onclick="location.reload()">❌</button>
+    <button id="intBtn" class="btn btn-action interrupt disabled" onclick="manualInterrupt()" disabled>我要说话 (插嘴)</button>
+    
+    <div class="row">
+      <button id="startBtn" class="btn btn-main call" onclick="startCall()">📞</button>
+      <button id="endBtn" class="btn btn-main hangup" style="display:none;" onclick="location.reload()">❌</button>
+    </div>
   </div>
 
 <script>
-let recognition;
-let isCalling = false;
-let chatHistory = [];
+let rec;
+let isCallActive = false;
+let history = [];
 const synth = window.speechSynthesis;
 
-// 1. 初始化语音识别 (兼容 iOS/Android)
-function setupVoice() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert("当前浏览器不支持语音功能，请使用 Safari (iOS) 或 Chrome (Android)");
-        return;
-    }
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US'; // 根据 VVR 设定使用英文
-    recognition.continuous = false; // 采用单次识别模式以减少杂音积累
-    recognition.interimResults = false;
+// 初始化
+function init() {
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Speech) return alert("请使用 Safari (iOS) 或 Chrome (Android)");
+    rec = new Speech();
+    rec.lang = 'en-US';
+    rec.continuous = false;
+    rec.interimResults = false;
 
-    recognition.onresult = (event) => {
-        const result = event.results[0][0].transcript;
-        processTalk(result);
+    rec.onstart = () => {
+        updateUI('user');
     };
 
-    recognition.onend = () => {
-        // 只有在通话中且 AI 没在说话时，才重新开启监听
-        if (isCalling && !synth.speaking) {
-            try { recognition.start(); } catch(e) {}
+    rec.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        sendMsg(text);
+    };
+
+    rec.onend = () => {
+        if (isCallActive && !synth.speaking) {
+            // 正常结束，等待中
+            updateUI('idle');
         }
     };
-
-    recognition.onerror = (e) => {
-        console.error("识别错误:", e.error);
-        if (e.error === 'not-allowed') alert("请允许麦克风权限");
-    };
 }
 
-// 2. 接通电话
-async function handleCallStart() {
-    setupVoice();
-    isCalling = true;
-    
-    // UI 更新
+// 通话控制
+function startCall() {
+    init();
+    isCallActive = true;
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('endBtn').style.display = 'flex';
-    document.getElementById('avatar').classList.add('active-call');
-    document.getElementById('subtitle').innerText = "正在接通 VVR...";
-
-    try {
-        // 关键：在 iOS 上需要先通过用户点击触发一次语音播放（解锁音频）
-        const unlock = new SpeechSynthesisUtterance("");
-        synth.speak(unlock);
-        
-        await recognition.start();
-        vvrSay("Hello! VVR is on the line. I'm ready for our conversation.");
-    } catch (err) {
-        console.error("启动失败", err);
-    }
+    document.getElementById('intBtn').classList.remove('disabled');
+    document.getElementById('intBtn').disabled = false;
+    
+    // 激活音频
+    synth.speak(new SpeechSynthesisUtterance(""));
+    vvrTalk("VVR is connected. I'm listening to you now.");
 }
 
-// 3. 处理对话逻辑
-async function processTalk(text) {
-    // 【打断机制】用户说话时停止 AI 播放
-    if (synth.speaking) synth.cancel();
+// 【新增功能】手动插嘴/暂停
+function manualInterrupt() {
+    if (!isCallActive) return;
     
-    // 【防干扰】开始思考请求时暂时关闭麦克风
-    try { recognition.stop(); } catch(e) {}
+    // 1. 立即停止 AI 说话
+    if (synth.speaking) {
+        synth.cancel();
+        console.log("手动打断 VVR");
+    }
+    
+    // 2. 强制开启麦克风听我说话
+    try {
+        rec.stop(); // 先停再开，确保重置
+        setTimeout(() => rec.start(), 200);
+    } catch(e) {
+        rec.start();
+    }
+    
+    document.getElementById('transcript').innerText = "请说，我在听...";
+}
 
-    document.getElementById('subtitle').innerText = "你: " + text;
-    
+// 核心对话
+async function sendMsg(text) {
+    document.getElementById('transcript').innerText = "你: " + text;
+    updateUI('thinking');
+
     try {
         const res = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text, history: chatHistory })
+            body: JSON.stringify({ message: text, history: history })
         });
         const data = await res.json();
-        
         if (data.reply) {
-            chatHistory.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
-            vvrSay(data.reply);
+            history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
+            vvrTalk(data.reply);
         }
     } catch (e) {
-        document.getElementById('subtitle').innerText = "信号连接超时...";
-        if (isCalling) recognition.start();
+        document.getElementById('status-msg').innerText = "连接失败";
     }
 }
 
-// 4. AI 说话（含表情过滤与 iOS 音质优化）
-function vvrSay(text) {
-    // 过滤所有 Emoji，防止 VVR 读出“微笑脸”等词
-    const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+function vvrTalk(text) {
+    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = 'en-US';
 
-    const msg = new SpeechSynthesisUtterance(cleanText);
-    msg.lang = 'en-US';
-    msg.rate = 1.0; 
-    msg.pitch = 1.1; // 增加一点点音调，增加可爱感
-
-    msg.onstart = () => {
-        // AI 说话时关闭识别，彻底杜绝回声干扰（解决电流声关键）
-        try { recognition.stop(); } catch(e) {}
-        document.getElementById('subtitle').innerText = "VVR: " + text;
+    utter.onstart = () => {
+        updateUI('vvr');
+        document.getElementById('transcript').innerText = "VVR: " + text;
     };
 
-    msg.onend = () => {
-        if (isCalling) {
-            // AI 说完后延迟 300ms 再开麦克风，避开喇叭余音
-            setTimeout(() => {
-                try { recognition.start(); } catch(e) {}
-                document.getElementById('subtitle').innerText = "VVR 正在听...";
-            }, 300);
+    utter.onend = () => {
+        if (isCallActive) {
+            updateUI('idle');
+            // 如果你希望 AI 说完后自动听，就加下面这句；
+            // 如果希望完全手动控制，就注释掉下面这句，只靠“我要说话”按钮。
+            setTimeout(() => { if(!synth.speaking) rec.start(); }, 400);
         }
     };
 
-    synth.speak(msg);
+    synth.speak(utter);
+}
+
+// UI 状态切换
+function updateUI(state) {
+    const av = document.getElementById('v-avatar');
+    const msg = document.getElementById('status-msg');
+    
+    av.className = "avatar";
+    if (state === 'vvr') {
+        av.classList.add('vvr-speaking');
+        msg.innerText = "VVR 正在说话...";
+    } else if (state === 'user') {
+        av.classList.add('user-speaking');
+        msg.innerText = "正在听你说话...";
+    } else if (state === 'thinking') {
+        msg.innerText = "VVR 正在思考...";
+    } else {
+        msg.innerText = "通话中...";
+    }
 }
 </script>
 </body>
