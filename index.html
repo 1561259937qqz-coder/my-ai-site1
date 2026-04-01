@@ -2,56 +2,48 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR World - Secure Edition</title>
+  <title>VVR World - Global Sync</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    :root { --primary: #667eea; --accent: #ff6b81; --bg: #0a0a0a; --card: #1a1a1a; --text: #eee; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    :root { --primary: #667eea; --accent: #ff6b81; --bg: #0a0a0a; --card: #1a1a1a; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); color: #eee; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-    /* 1. 登录遮罩层 */
+    /* 登录层 */
     #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(15px); }
-    .login-box { background: var(--card); padding: 35px; border-radius: 24px; width: 85%; max-width: 340px; text-align: center; border: 1px solid #333; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-    .login-box h2 { margin-bottom: 25px; color: var(--primary); font-size: 24px; }
-    .login-box input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #333; background: #252525; color: white; box-sizing: border-box; font-size: 16px; outline: none; }
-    .login-box input:focus { border-color: var(--primary); }
-    .login-box button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: 600; cursor: pointer; margin-top: 15px; font-size: 16px; transition: 0.3s; }
-    .login-box button:active { transform: scale(0.95); }
+    .login-box { background: var(--card); padding: 30px; border-radius: 24px; width: 85%; max-width: 320px; text-align: center; border: 1px solid #333; }
+    .login-box input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
+    .login-box button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--primary); color: white; font-weight: bold; margin-top: 15px; }
 
-    /* 2. 导航栏 */
-    nav { display: flex; justify-content: space-around; background: var(--card); padding: 16px 0; border-bottom: 1px solid #222; }
-    nav button { background: none; border: none; color: #666; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.3s; padding: 5px 10px; }
+    /* 导航 */
+    nav { display: flex; justify-content: space-around; background: var(--card); padding: 15px 0; border-bottom: 1px solid #222; }
+    nav button { background: none; border: none; color: #666; font-weight: bold; cursor: pointer; }
     nav button.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
 
-    /* 3. 页面容器 */
-    .page { display: none; flex: 1; flex-direction: column; height: 100%; overflow: hidden; animation: slideUp 0.4s ease; }
+    .page { display: none; flex: 1; flex-direction: column; overflow: hidden; }
     .page.active { display: flex; }
-    @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* 列表区域 */
+    .scroll-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+    .bubble { padding: 12px 16px; border-radius: 18px; max-width: 80%; font-size: 15px; }
+    .user { background: var(--primary); align-self: flex-end; }
+    .bot { background: #2a2a2a; align-self: flex-start; border: 1px solid #333; }
+
+    /* 留言板卡片 */
+    .board-card { background: var(--card); padding: 15px; border-radius: 12px; border-left: 4px solid var(--accent); animation: slideIn 0.3s; }
+    .board-user { font-size: 11px; color: var(--accent); font-weight: bold; margin-bottom: 5px; }
+    .board-time { font-size: 10px; color: #555; float: right; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* 输入框 */
+    .input-bar { padding: 15px 15px 35px; background: var(--card); display: flex; gap: 10px; }
+    .input-bar input { flex: 1; background: #252525; border: none; padding: 12px; border-radius: 20px; color: white; outline: none; }
+    .input-bar button { background: var(--primary); border: none; padding: 0 20px; border-radius: 20px; color: white; font-weight: bold; }
 
     /* 通话组件 */
-    .call-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .v-avatar { width: 150px; height: 150px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #764ba2); display: flex; align-items: center; justify-content: center; font-size: 65px; border: 4px solid #222; margin-bottom: 30px; transition: 0.4s; position: relative; }
-    .v-speaking { border-color: var(--accent); box-shadow: 0 0 40px rgba(255, 107, 129, 0.5); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-    #call-status { color: #888; text-align: center; font-size: 15px; padding: 0 40px; height: 60px; line-height: 1.5; }
-
-    /* 聊天与留言列表 */
-    .scroll-list { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; -webkit-overflow-scrolling: touch; }
-    .bubble { padding: 12px 16px; border-radius: 18px; max-width: 80%; font-size: 15px; word-wrap: break-word; }
-    .user { background: var(--primary); align-self: flex-end; color: white; border-bottom-right-radius: 4px; }
-    .bot { background: #2a2a2a; align-self: flex-start; border: 1px solid #333; border-bottom-left-radius: 4px; }
-    
-    .input-group { padding: 15px; background: var(--card); display: flex; gap: 10px; padding-bottom: 35px; }
-    .input-group input { flex: 1; background: #252525; border: none; padding: 12px 18px; border-radius: 25px; color: white; outline: none; font-size: 15px; }
-    .input-group button { background: var(--primary); border: none; width: 60px; border-radius: 25px; color: white; font-weight: bold; }
-
-    /* 留言卡片 */
-    .post-card { background: var(--card); padding: 16px; border-radius: 15px; border-left: 4px solid var(--accent); position: relative; }
-    .post-author { font-size: 12px; color: var(--accent); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
-
-    /* 通话按钮 */
-    .call-btns { padding-bottom: 60px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
-    .round-btn { width: 75px; height: 75px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 32px; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-    .round-btn:active { transform: scale(0.9); }
+    .call-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .v-ava { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #764ba2); display: flex; align-items: center; justify-content: center; font-size: 60px; border: 4px solid #222; margin-bottom: 20px; transition: 0.4s; }
+    .speaking { border-color: var(--accent); box-shadow: 0 0 30px rgba(255, 107, 129, 0.4); }
   </style>
 </head>
 <body>
@@ -59,168 +51,147 @@
 <div id="login-overlay">
   <div class="login-box">
     <h2>VVR 系统登录</h2>
-    <input type="text" id="acc" placeholder="账号 (xiaola / vvr)">
+    <input type="text" id="acc" placeholder="账号">
     <input type="password" id="pwd" placeholder="密码">
-    <button onclick="handleLogin()">登录</button>
-    <p id="login-err" style="color:var(--accent); font-size:12px; margin-top:10px; display:none;">账号或密码错误</p>
+    <button onclick="login()">进入世界</button>
   </div>
 </div>
 
 <nav>
-  <button onclick="switchTab('call')" id="tab-call" class="active">通话</button>
-  <button onclick="switchTab('chat')" id="tab-chat">聊天</button>
-  <button onclick="switchTab('board')" id="tab-board">留言</button>
+  <button onclick="setTab('call')" id="t-call" class="active">通话</button>
+  <button onclick="setTab('chat')" id="t-chat">聊天</button>
+  <button onclick="setTab('board')" id="t-board">全球留言板</button>
 </nav>
 
-<div id="page-call" class="page active">
-  <div class="call-wrap">
-    <div id="v-ava" class="v-avatar">V</div>
-    <div id="call-status">未接通</div>
-  </div>
-  <div class="call-btns">
-    <button id="int-btn" style="background:#5856d6; color:white; border:none; padding:12px 30px; border-radius:25px; display:none; font-weight:600;" onclick="doInterrupt()">插嘴 / 我要说话</button>
-    <div style="display:flex; gap:35px;">
-      <button id="btn-start" onclick="initCall()" class="round-btn" style="background:#34c759;">📞</button>
-      <button id="btn-end" onclick="location.reload()" class="round-btn" style="background:#ff3b30; display:none;">❌</button>
+<div id="p-call" class="page active">
+    <div class="call-main">
+        <div id="v-ava" class="v-ava">V</div>
+        <p id="c-status" style="color:#666">准备就绪</p>
     </div>
-  </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:20px; padding-bottom:60px;">
+        <button id="int-btn" style="background:#5856d6; color:white; border:none; padding:10px 25px; border-radius:20px; display:none;" onclick="interrupt()">插嘴</button>
+        <div style="display:flex; gap:30px;">
+            <button id="s-btn" onclick="startVVR()" style="width:70px;height:70px;border-radius:50%;background:#34c759;border:none;font-size:30px;">📞</button>
+            <button onclick="location.reload()" style="width:70px;height:70px;border-radius:50%;background:#ff3b30;border:none;font-size:30px;">❌</button>
+        </div>
+    </div>
 </div>
 
-<div id="page-chat" class="page">
-  <div id="chat-box" class="scroll-list"></div>
-  <div class="input-group">
-    <input id="chat-in" placeholder="发送文字消息...">
-    <button onclick="textChat()">发送</button>
-  </div>
-</div>
-
-<div id="page-board" class="page">
-  <div id="board-box" class="scroll-list"></div>
-  <div class="input-group">
-    <input id="board-in" placeholder="写下你的留言...">
-    <button onclick="addPost()" style="background:var(--accent)">发布</button>
-  </div>
-</div>
+<div id="p-chat" class="page"><div id="chat-list" class="scroll-area"></div><div class="input-bar"><input id="chat-in"><button onclick="doChat()">发送</button></div></div>
+<div id="p-board" class="page"><div id="board-list" class="scroll-area"></div><div class="input-bar"><input id="board-in" placeholder="留言将同步给所有人..."><button onclick="postToDB()" style="background:var(--accent)">发布</button></div></div>
 
 <script>
+// --- 重要：配置你的 Supabase ---
+const SB_URL = "https://你的项目ID.supabase.co"; 
+const SB_KEY = "你的匿名Key";
+const supabase = supabase.createClient(SB_URL, SB_KEY);
+
 let user = "";
-let callActive = false;
 let history = [];
+let isCall = false;
 const synth = window.speechSynthesis;
 let rec;
 
-// --- 登录逻辑 ---
-function handleLogin() {
-    const a = document.getElementById('acc').value.trim();
+// --- 1. 登录与权限 ---
+function login() {
+    const a = document.getElementById('acc').value;
     const p = document.getElementById('pwd').value;
-    const err = document.getElementById('login-err');
-
-    // 这里设置你的账号密码
-    if ((a === 'xiaola' && p === '123456') || (a === 'vvr' && p === '654321')) {
+    if((a==='xiaola'&&p==='123456') || (a==='vvr'&&p==='654321')) {
         user = a;
         document.getElementById('login-overlay').style.display = 'none';
-        addChat(`欢迎回来，${user}。我是 VVR，通话功能已就绪。`, 'bot');
-    } else {
-        err.style.display = 'block';
+        loadMessages(); // 登录后加载全球留言
+    } else alert("错误");
+}
+
+// --- 2. 全球留言板逻辑 (保存到云端) ---
+async function postToDB() {
+    const content = document.getElementById('board-in').value.trim();
+    if(!content) return;
+
+    // 保存到 Supabase 数据库表 'messages'
+    const { error } = await supabase
+        .from('messages') 
+        .insert([{ author: user, text: content, created_at: new Date() }]);
+
+    if(!error) {
+        document.getElementById('board-in').value = "";
+        loadMessages(); // 刷新
     }
 }
 
-// --- 导航切换 ---
-function switchTab(t) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.getElementById('page-'+t).classList.add('active');
-    document.getElementById('tab-'+t).classList.add('active');
-}
+async function loadMessages() {
+    // 从云端读取所有人的留言
+    const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-// --- 通话核心 ---
-function initCall() {
-    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if(!Speech) return alert("当前浏览器不支持录音");
-    rec = new Speech();
-    rec.lang = 'en-US';
-    rec.onresult = (e) => talkLogic(e.results[0][0].transcript, true);
-    rec.onend = () => { if(callActive && !synth.speaking) rec.start(); };
-    
-    callActive = true;
-    document.getElementById('btn-start').style.display = 'none';
-    document.getElementById('btn-end').style.display = 'flex';
-    document.getElementById('int-btn').style.display = 'block';
-    synth.speak(new SpeechSynthesisUtterance("")); // 解锁iOS
-    vvrSpeak(`Hello ${user}, VVR is now connected. What's on your mind?`);
-}
-
-function doInterrupt() {
-    if(synth.speaking) synth.cancel();
-    try { rec.stop(); setTimeout(() => rec.start(), 300); } catch(e) { rec.start(); }
-}
-
-async function talkLogic(text, isVoice) {
-    if(isVoice && synth.speaking) synth.cancel();
-    if(!isVoice) addChat(text, 'user');
-    document.getElementById('call-status').innerText = "你: " + text;
-
-    try {
-        const res = await fetch("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text, history: history, username: user })
+    if(data) {
+        const box = document.getElementById('board-list');
+        box.innerHTML = "";
+        data.forEach(m => {
+            const d = document.createElement('div');
+            d.className = "board-card";
+            d.innerHTML = `<span class="board-time">${new Date(m.created_at).toLocaleTimeString()}</span>
+                           <div class="board-user">@${m.author}</div><div>${m.text}</div>`;
+            box.appendChild(d);
         });
-        const data = await res.json();
-        if (data.reply) {
-            history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
-            addChat(data.reply, 'bot');
-            vvrSpeak(data.reply);
-        }
-    } catch (e) { console.error(e); }
+    }
 }
 
-function vvrSpeak(text) {
-    // 过滤字符与Emoji
-    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-                      .replace(/[*_#~`[\]()<>\\|{}]/g, ' ').trim();
-
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = 'en-US';
-    utter.onstart = () => {
-        document.getElementById('v-ava').classList.add('v-speaking');
-        document.getElementById('call-status').innerText = "VVR: " + text;
-        if(rec) try { rec.stop(); } catch(e) {}
-    };
-    utter.onend = () => {
-        document.getElementById('v-ava').classList.remove('v-speaking');
-        if(callActive) setTimeout(() => { if(!synth.speaking) rec.start(); }, 500);
-    };
-    synth.speak(utter);
+// --- 3. 语音与通话 (整合之前的逻辑) ---
+function startVVR() {
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    rec = new Speech(); rec.lang = 'en-US';
+    rec.onresult = (e) => handleAll(e.results[0][0].transcript, true);
+    rec.onend = () => { if(isCall && !synth.speaking) rec.start(); };
+    isCall = true;
+    document.getElementById('s-btn').style.display='none';
+    document.getElementById('int-btn').style.display='block';
+    synth.speak(new SpeechSynthesisUtterance(""));
+    vvrTalk(`Welcome to the synchronized world, ${user}.`);
 }
 
-// --- UI 辅助 ---
-function textChat() {
-    const input = document.getElementById('chat-in');
-    if(!input.value.trim()) return;
-    talkLogic(input.value.trim(), false);
-    input.value = "";
+async function handleAll(text, isVoice) {
+    if(isVoice && synth.speaking) synth.cancel();
+    if(!isVoice) addBubble(text, 'user');
+    document.getElementById('c-status').innerText = "你: " + text;
+
+    const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history: history })
+    });
+    const data = await res.json();
+    if(data.reply) {
+        history.push({role:"user", content:text}, {role:"assistant", content:data.reply});
+        addBubble(data.reply, 'bot');
+        vvrTalk(data.reply);
+    }
 }
 
-function addChat(text, type) {
-    const box = document.getElementById('chat-box');
-    const d = document.createElement('div');
-    d.className = `bubble ${type}`;
-    d.innerText = text;
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
+function vvrTalk(text) {
+    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'en-US';
+    u.onstart = () => { document.getElementById('v-ava').classList.add('speaking'); if(rec) try{rec.stop()}catch(e){} };
+    u.onend = () => { document.getElementById('v-ava').classList.remove('speaking'); if(isCall) setTimeout(()=>rec.start(), 500); };
+    synth.speak(u);
 }
 
-function addPost() {
-    const input = document.getElementById('board-in');
-    if(!input.value.trim()) return;
-    const box = document.getElementById('board-box');
-    const d = document.createElement('div');
-    d.className = "post-card";
-    d.innerHTML = `<div class="post-author">@${user}</div><div>${input.value}</div>`;
-    box.prepend(d);
-    input.value = "";
+// --- 4. 基础 UI ---
+function setTab(t) {
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.getElementById('p-'+t).classList.add('active');
+    document.getElementById('t-'+t).classList.add('active');
 }
+function addBubble(t, c) {
+    const l = document.getElementById('chat-list');
+    const d = document.createElement('div'); d.className=`bubble ${c}`; d.innerText=t;
+    l.appendChild(d); l.scrollTop = l.scrollHeight;
+}
+function doChat() { const i = document.getElementById('chat-in'); if(i.value) { handleAll(i.value, false); i.value=""; } }
 </script>
 </body>
 </html>
