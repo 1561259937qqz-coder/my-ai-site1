@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR World - Final Stable</title>
+  <title>VVR World - Final Sync</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
@@ -38,7 +38,7 @@
     <h2 style="color:var(--primary); margin-top:0;">VVR 系统登录</h2>
     <input type="text" id="acc" placeholder="账号 (xiaola / vvr)">
     <input type="password" id="pwd" placeholder="密码">
-    <button id="loginBtn">进入同步世界</button>
+    <button onclick="login()">进入同步世界</button>
   </div>
 </div>
 
@@ -73,113 +73,111 @@
 </div>
 
 <script>
-// 所有的逻辑封装在 DOMContentLoaded 中，确保页面加载完再跑 JS
-document.addEventListener('DOMContentLoaded', () => {
-    
-    // 配置 Supabase
-    const SUPABASE_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
-    const SUPABASE_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// --- 1. 初始化 Supabase (使用唯一变量名避免声明冲突) ---
+const VVR_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
+const VVR_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
+const vvrSupabase = supabase.createClient(VVR_URL, VVR_KEY);
 
-    let currentUser = "";
-    let callActive = false;
-    let chatHistory = [];
-    const synth = window.speechSynthesis;
-    let recognition;
+let currentUser = "";
+let callActive = false;
+let chatHistory = [];
+const synth = window.speechSynthesis;
+let recognition;
 
-    // --- 修复：手动绑定登录按钮事件 ---
-    document.getElementById('loginBtn').addEventListener('click', () => {
-        const a = document.getElementById('acc').value.trim();
-        const p = document.getElementById('pwd').value;
-        if((a==='xiaola'&&p==='123456') || (a==='vvr'&&p==='654321')) {
-            currentUser = a;
-            document.getElementById('login-overlay').style.display = 'none';
-            syncBoard(); 
-        } else {
-            alert("账号密码不匹配");
+// --- 2. 登录函数 (名字严格匹配 onclick) ---
+function login() {
+    const a = document.getElementById('acc').value.trim();
+    const p = document.getElementById('pwd').value;
+    if((a==='xiaola'&&p==='123456') || (a==='vvr'&&p==='654321')) {
+        currentUser = a;
+        document.getElementById('login-overlay').style.display = 'none';
+        syncBoard(); 
+    } else {
+        alert("账号密码不匹配");
+    }
+}
+
+// --- 3. 全球留言逻辑 ---
+async function saveToCloud() {
+    const content = document.getElementById('board-in').value.trim();
+    if(!content) return;
+    const { error } = await vvrSupabase.from('messages').insert([{ author: currentUser, content: content, created_at: new Date() }]);
+    if(!error) { 
+        document.getElementById('board-in').value = ""; 
+        syncBoard(); 
+    } else {
+        console.error("数据库错误:", error);
+    }
+}
+
+async function syncBoard() {
+    const { data } = await vvrSupabase.from('messages').select('*').order('created_at', { ascending: false });
+    if(data) {
+        const box = document.getElementById('board-list'); 
+        box.innerHTML = "";
+        data.forEach(m => {
+            const d = document.createElement('div'); 
+            d.className = "post-card";
+            d.innerHTML = `<div class="post-user">@${m.author}</div><div>${m.content}</div>`;
+            box.appendChild(d);
+        });
+    }
+}
+
+// --- 4. 通话逻辑 ---
+function startCall() {
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new Speech(); 
+    recognition.lang = 'en-US';
+    recognition.onresult = (e) => processAction(e.results[0][0].transcript, true);
+    recognition.onend = () => { if(callActive && !synth.speaking) recognition.start(); };
+    callActive = true;
+    document.getElementById('s-btn').style.display='none';
+    document.getElementById('int-btn').style.display='block';
+    synth.speak(new SpeechSynthesisUtterance("")); // 解锁移动端音频
+    vvrTalk(`Connected. Hello ${currentUser}.`);
+}
+
+function interrupt() {
+    if(synth.speaking) synth.cancel();
+    try { recognition.stop(); setTimeout(() => recognition.start(), 300); } catch(e) { recognition.start(); }
+}
+
+async function processAction(text, isVoice) {
+    if(isVoice && synth.speaking) synth.cancel();
+    if(!isVoice) appendBubble(text, 'user');
+    document.getElementById('c-status').innerText = "你: " + text;
+    try {
+        const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, history: chatHistory }) });
+        const data = await res.json();
+        if (data.reply) {
+            chatHistory.push({role:"user", content:text}, {role:"assistant", content:data.reply});
+            appendBubble(data.reply, 'bot');
+            vvrTalk(data.reply);
         }
-    });
+    } catch (e) { console.error(e); }
+}
 
-    // --- 全球留言逻辑 ---
-    window.saveToCloud = async () => {
-        const content = document.getElementById('board-in').value.trim();
-        if(!content) return;
-        const { error } = await supabaseClient.from('messages').insert([{ author: currentUser, content: content, created_at: new Date() }]);
-        if(!error) { document.getElementById('board-in').value = ""; syncBoard(); }
-        else { console.error(error); alert("保存失败，请检查数据库表权限"); }
-    };
+function vvrTalk(text) {
+    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = 'en-US';
+    utter.onstart = () => { document.getElementById('v-ava').classList.add('speaking'); document.getElementById('c-status').innerText = "VVR: " + text; if(recognition) try{recognition.stop()}catch(e){} };
+    utter.onend = () => { document.getElementById('v-ava').classList.remove('speaking'); if(callActive) setTimeout(()=>recognition.start(), 500); };
+    synth.speak(utter);
+}
 
-    window.syncBoard = async () => {
-        const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false });
-        if(data) {
-            const box = document.getElementById('board-list'); box.innerHTML = "";
-            data.forEach(m => {
-                const d = document.createElement('div'); d.className = "post-card";
-                d.innerHTML = `<div class="post-user">@${m.author}</div><div>${m.content}</div>`;
-                box.appendChild(d);
-            });
-        }
-    };
+// --- 5. UI 切换逻辑 ---
+function setTab(t) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('p-'+t).classList.add('active');
+    document.getElementById('t-'+t).classList.add('active');
+    if(t === 'board') syncBoard();
+}
 
-    // --- 通话逻辑 ---
-    window.startCall = () => {
-        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new Speech(); recognition.lang = 'en-US';
-        recognition.onresult = (e) => processAction(e.results[0][0].transcript, true);
-        recognition.onend = () => { if(callActive && !synth.speaking) recognition.start(); };
-        callActive = true;
-        document.getElementById('s-btn').style.display='none';
-        document.getElementById('int-btn').style.display='block';
-        synth.speak(new SpeechSynthesisUtterance(""));
-        vvrTalk(`Connected. Hello ${currentUser}.`);
-    };
-
-    window.interrupt = () => {
-        if(synth.speaking) synth.cancel();
-        try { recognition.stop(); setTimeout(() => recognition.start(), 300); } catch(e) { recognition.start(); }
-    };
-
-    async function processAction(text, isVoice) {
-        if(isVoice && synth.speaking) synth.cancel();
-        if(!isVoice) appendBubble(text, 'user');
-        document.getElementById('c-status').innerText = "你: " + text;
-        try {
-            const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, history: chatHistory }) });
-            const data = await res.json();
-            if (data.reply) {
-                chatHistory.push({role:"user", content:text}, {role:"assistant", content:data.reply});
-                appendBubble(data.reply, 'bot');
-                vvrTalk(data.reply);
-            }
-        } catch (e) { console.error(e); }
-    }
-
-    function vvrTalk(text) {
-        const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
-        const utter = new SpeechSynthesisUtterance(clean);
-        utter.lang = 'en-US';
-        utter.onstart = () => { document.getElementById('v-ava').classList.add('speaking'); document.getElementById('c-status').innerText = "VVR: " + text; if(recognition) try{recognition.stop()}catch(e){} };
-        utter.onend = () => { document.getElementById('v-ava').classList.remove('speaking'); if(callActive) setTimeout(()=>recognition.start(), 500); };
-        synth.speak(utter);
-    }
-
-    // --- UI 基础逻辑 ---
-    window.setTab = (t) => {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-        document.getElementById('p-'+t).classList.add('active');
-        document.getElementById('t-'+t).classList.add('active');
-        if(t === 'board') syncBoard();
-    };
-
-    window.sendTextChat = () => { const i = document.getElementById('chat-in'); if(i.value.trim()){ processAction(i.value.trim(), false); i.value=""; } };
-    
-    function appendBubble(t, c) { 
-        const l = document.getElementById('chat-list'); 
-        const d = document.createElement('div'); d.className=`bubble ${c}`; d.innerText=t; 
-        l.appendChild(d); l.scrollTop = l.scrollHeight; 
-    }
-});
+function sendTextChat() { const i = document.getElementById('chat-in'); if(i.value.trim()){ processAction(i.value.trim(), false); i.value=""; } }
+function appendBubble(t, c) { const l = document.getElementById('chat-list'); const d = document.createElement('div'); d.className=`bubble ${c}`; d.innerText=t; l.appendChild(d); l.scrollTop = l.scrollHeight; }
 </script>
 </body>
 </html>
