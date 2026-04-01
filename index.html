@@ -1,81 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+  <meta charset="UTF-8">
   <title>VVR World</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     body {
       margin: 0;
-      font-family: "Segoe UI";
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+      height: 100vh;
     }
 
-    .page { display:none; height:100vh; flex-direction:column; }
-    .active { display:flex; }
-    .center { justify-content:center; align-items:center; }
+    .page { display: none; height: 100vh; flex-direction: column; }
+    .active { display: flex; }
+    .center { justify-content: center; align-items: center; }
 
     .card {
-      background:white;
-      padding:25px;
-      border-radius:20px;
-      box-shadow:0 10px 30px rgba(0,0,0,0.2);
-      text-align:center;
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      text-align: center;
+      width: 80%;
+      max-width: 300px;
     }
 
     input {
-      width:90%;
-      padding:10px;
-      margin:8px;
-      border-radius:10px;
-      border:none;
-      background:#f1f1f1;
+      width: 90%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      background: #f9f9f9;
     }
 
     button {
-      padding:10px 15px;
-      border-radius:10px;
-      border:none;
-      background:#ff6b81;
-      color:white;
-      cursor:pointer;
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      background: #ff6b81;
+      color: white;
+      cursor: pointer;
+      transition: 0.3s;
     }
 
-    #chat, #posts {
-      flex:1;
-      overflow:auto;
-      padding:10px;
+    button:hover { background: #ff4757; }
+
+    #chat-content, #posts-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
     }
 
     .msg {
-      margin:8px;
-      padding:10px;
-      border-radius:10px;
-      max-width:70%;
+      margin: 8px 0;
+      padding: 10px;
+      border-radius: 10px;
+      max-width: 80%;
+      word-wrap: break-word;
     }
 
-    .user { background:#4facfe; color:white; margin-left:auto; }
-    .bot { background:white; }
+    .user-msg { background: #4facfe; color: white; margin-left: auto; }
+    .bot-msg { background: white; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 
-    .post {
-      background:white;
-      padding:10px;
-      margin:10px;
-      border-radius:15px;
+    .post-card {
+      background: white;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    .comment-item {
+      font-size: 0.9em;
+      background: #f1f1f1;
+      padding: 5px 10px;
+      margin: 5px 0;
+      border-radius: 5px;
     }
 
     #nav {
-      display:flex;
-      justify-content:space-around;
-      background:white;
-      padding:10px;
+      display: flex;
+      justify-content: space-around;
+      background: white;
+      padding: 10px 0;
+      border-top: 1px solid #eee;
     }
 
-    #inputArea { display:flex; padding:10px; background:white; }
-    #inputArea input { flex:1; }
-
+    .input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #eee; }
+    .input-area input { flex: 1; margin-right: 10px; }
   </style>
 </head>
 
@@ -84,208 +101,228 @@
 <div id="loginPage" class="page active center">
   <div class="card">
     <h2>Login</h2>
-    <input id="username" placeholder="username">
-    <input id="password" type="password" placeholder="password">
-    <button onclick="login()">Enter</button>
+    <input id="login-user" placeholder="用户名 (vvr / xiaola)">
+    <input id="login-pass" type="password" placeholder="密码">
+    <button onclick="handleLogin()">Enter</button>
   </div>
 </div>
 
 <div id="mainPage" class="page">
 
-  <div id="chatPage" class="page active">
-    <div id="chat"></div>
-
-    <div id="inputArea">
-      <input id="chatInput" placeholder="Talk to VVR...">
-      <button onclick="send()">Send</button>
+  <div id="chatSection" class="page active" style="height: calc(100vh - 60px);">
+    <div id="chat-content"></div>
+    <div class="input-area">
+      <input id="chatInput" placeholder="给 VVR 发消息...">
+      <button onclick="handleSend()">发送</button>
       <button onclick="startVoice()">🎤</button>
     </div>
   </div>
 
-  <div id="postPage" class="page">
-    <div id="posts"></div>
-
-    <div id="inputArea">
-      <input id="postInput" placeholder="Say something...">
-      <button onclick="addPost()">Post</button>
+  <div id="postSection" class="page" style="height: calc(100vh - 60px);">
+    <div id="posts-list"></div>
+    <div class="input-area">
+      <input id="postInput" placeholder="分享点什么...">
+      <button onclick="handleAddPost()">发布</button>
     </div>
   </div>
 
   <div id="nav">
-    <button onclick="show('chatPage')">Chat</button>
-    <button onclick="show('postPage')">Community</button>
-    <button onclick="logout()">Logout</button>
+    <button onclick="switchTo('chatSection')">聊天</button>
+    <button onclick="switchTo('postSection')">社区</button>
+    <button onclick="handleLogout()">退出</button>
   </div>
 
 </div>
 
 <script>
-const SUPABASE_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co";
-const SUPABASE_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
+// --- 配置区 ---
+const SUPABASE_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; // 保持不变
+const SUPABASE_KEY = "你的ANON_KEY"; // 替换为你的 Publishable key
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 固定用户
-const users = [
+const allowedUsers = [
   { username: "xiaola", password: "060530" },
   { username: "vvr", password: "031210" }
 ];
 
 let currentUser = null;
-let history = [];
-let posts = [];
+let chatHistory = [];
+let globalPosts = [];
 
-// 登录
-function login() {
-  const name = document.getElementById("username").value;
-  const pass = document.getElementById("password").value;
+// --- 登录逻辑 ---
+function handleLogin() {
+  const uInput = document.getElementById("login-user").value;
+  const pInput = document.getElementById("login-pass").value;
 
-  const user = users.find(u => u.username === name && u.password === pass);
+  const user = allowedUsers.find(u => u.username === uInput && u.password === pInput);
+  
   if (!user) {
-    alert("账号或密码错误");
+    alert("账号或密码错误！");
     return;
   }
 
   currentUser = user;
-  localStorage.setItem("user", JSON.stringify(user));
-  showMain();
+  localStorage.setItem("vvr_user", JSON.stringify(user));
+  showMainInterface();
 }
 
-function showMain() {
-  loginPage.classList.remove("active");
-  mainPage.classList.add("active");
-  loadPosts();
+function showMainInterface() {
+  document.getElementById("loginPage").classList.remove("active");
+  document.getElementById("mainPage").classList.add("active");
+  loadSupabasePosts();
 }
 
-function logout() {
-  localStorage.removeItem("user");
+function handleLogout() {
+  localStorage.removeItem("vvr_user");
   location.reload();
 }
 
-function show(page) {
-  chatPage.classList.remove("active");
-  postPage.classList.remove("active");
-  document.getElementById(page).classList.add("active");
+function switchTo(sectionId) {
+  document.getElementById("chatSection").classList.remove("active");
+  document.getElementById("postSection").classList.remove("active");
+  document.getElementById(sectionId).classList.add("active");
 }
 
-// 聊天
-function createMsg(text, cls) {
+// --- 聊天功能 ---
+function appendChatMsg(text, type) {
+  const container = document.getElementById("chat-content");
   const div = document.createElement("div");
-  div.className = "msg " + cls;
+  div.className = "msg " + (type === 'user' ? "user-msg" : "bot-msg");
   div.innerText = text;
-  chat.appendChild(div);
+  container.appendChild(div);
   div.scrollIntoView();
 }
 
-async function send() {
-  const msg = chatInput.value;
+async function handleSend() {
+  const input = document.getElementById("chatInput");
+  const msg = input.value.trim();
   if (!msg) return;
 
-  createMsg(msg, "user");
-  chatInput.value = "";
+  appendChatMsg(msg, "user");
+  input.value = "";
 
-  const res = await fetch("/api/chat", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ message: msg, history })
-  });
-
-  const data = await res.json();
-  createMsg(data.reply, "bot");
-  speak(data.reply);
+  // 注意：此 API 需你后端支持，否则会报错
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg, history: chatHistory })
+    });
+    const data = await res.json();
+    appendChatMsg(data.reply, "bot");
+    speakResponse(data.reply);
+  } catch (e) {
+    appendChatMsg("AI 接口未连接 (请检查后端 API)", "bot");
+  }
 }
 
-// 回车发送
-chatInput.addEventListener("keydown", e=>{
-  if(e.key==="Enter") send();
-});
+// --- 社区功能 (Supabase) ---
+async function handleAddPost() {
+  const input = document.getElementById("postInput");
+  const text = input.value.trim();
+  if (!text || !currentUser) return;
 
-// 🎤 语音
-function startVoice(){
-  const r = new webkitSpeechRecognition();
-  r.lang="en-US";
-
-  r.onresult = e=>{
-    chatInput.value = e.results[0][0].transcript;
-    send();
-  };
-
-  r.start();
-}
-
-// 🔊 AI说话
-function speak(text){
-  const u = new SpeechSynthesisUtterance(text);
-  speechSynthesis.speak(u);
-}
-
-// 发帖
-async function addPost(){
-  const text = postInput.value;
-  if(!text) return;
-
-  await supabase.from("posts").insert([
-    { user: currentUser.username, text, comments: [] }
+  const { error } = await supabase.from("posts").insert([
+    { user: currentUser.username, text: text, comments: [] }
   ]);
 
-  postInput.value="";
-  loadPosts();
+  if (error) {
+    console.error(error);
+    alert("发布失败，请检查数据库权限");
+  } else {
+    input.value = "";
+    loadSupabasePosts();
+  }
 }
 
-// 读取
-async function loadPosts(){
-  const { data } = await supabase.from("posts").select("*");
-  posts = data || [];
-  renderPosts();
+async function loadSupabasePosts() {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("加载失败:", error);
+    return;
+  }
+  globalPosts = data || [];
+  renderPostsList();
 }
 
-// 评论
-async function addComment(i){
-  const input = document.getElementById("c"+i);
-  if(!input.value) return;
+async function handleAddComment(index) {
+  const input = document.getElementById(`comment-in-${index}`);
+  const val = input.value.trim();
+  if (!val) return;
 
-  let post = posts[i];
+  const post = globalPosts[index];
+  const newComments = [...(post.comments || []), { user: currentUser.username, text: val }];
 
-  post.comments.push({
-    user: currentUser.username,
-    text: input.value
-  });
-
-  await supabase.from("posts")
-    .update({ comments: post.comments })
+  const { error } = await supabase
+    .from("posts")
+    .update({ comments: newComments })
     .eq("id", post.id);
 
-  loadPosts();
+  if (error) alert("评论失败");
+  else loadSupabasePosts();
 }
 
-// 渲染
-function renderPosts(){
-  const div = document.getElementById("posts");
-  div.innerHTML="";
+function renderPostsList() {
+  const container = document.getElementById("posts-list");
+  container.innerHTML = "";
 
-  posts.forEach((p,i)=>{
-    let html = `<div class="post">
-      <b>${p.user}</b><br>${p.text}<br>`;
+  globalPosts.forEach((p, i) => {
+    let commentHtml = (p.comments || []).map(c => 
+      `<div class="comment-item"><b>${c.user}:</b> ${c.text}</div>`
+    ).join("");
 
-    (p.comments||[]).forEach(c=>{
-      html += `<p>${c.user}: ${c.text}</p>`;
-    });
-
-    html += `
-      <input id="c${i}" placeholder="comment">
-      <button onclick="addComment(${i})">Send</button>
-    </div>`;
-
-    div.innerHTML += html;
+    const card = document.createElement("div");
+    card.className = "post-card";
+    card.innerHTML = `
+      <div style="color:#ff6b81; font-weight:bold; margin-bottom:5px;">@${p.user}</div>
+      <div style="margin-bottom:10px;">${p.text}</div>
+      <div id="comments-area-${i}">${commentHtml}</div>
+      <div style="margin-top:10px; display:flex;">
+        <input id="comment-in-${i}" style="font-size:12px; padding:5px;" placeholder="写评论...">
+        <button onclick="handleAddComment(${i})" style="padding:5px 10px; font-size:12px; margin-left:5px;">发送</button>
+      </div>
+    `;
+    container.appendChild(card);
   });
 }
 
-// 自动登录
-const saved = localStorage.getItem("user");
-if(saved){
-  currentUser = JSON.parse(saved);
-  showMain();
+// --- 语音辅助 ---
+function startVoice() {
+  const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+  if (!SpeechRecognition) return alert("当前浏览器不支持语音识别");
+  
+  const recognition = new SpeechRecognition();
+  recognition.lang = "zh-CN";
+  recognition.onresult = (e) => {
+    document.getElementById("chatInput").value = e.results[0][0].transcript;
+  };
+  recognition.start();
 }
+
+function speakResponse(text) {
+  if (window.speechSynthesis) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "zh-CN";
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
+// --- 初始化检查 ---
+window.onload = () => {
+  const saved = localStorage.getItem("vvr_user");
+  if (saved) {
+    currentUser = JSON.parse(saved);
+    showMainInterface();
+  }
+  
+  // 回车监听
+  document.getElementById("chatInput").onkeydown = (e) => { if(e.key === "Enter") handleSend(); };
+};
 </script>
 
 </body>
