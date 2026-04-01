@@ -2,224 +2,216 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>VVR - 秘密小圈</title>
+  <title>VVR Studio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    :root { --primary: #7b61ff; --accent: #ff4757; --bg: #050505; --card: #121212; }
-    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); color: #e0e0e0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    :root { --primary: #007aff; --accent: #ff3b30; --bg: #000000; --card: #1c1c1e; --glass: rgba(28, 28, 30, 0.7); }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: #ffffff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-    /* 登录层 */
-    #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.98); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(20px); }
-    .login-box { background: var(--card); padding: 40px 30px; border-radius: 28px; width: 85%; max-width: 320px; text-align: center; border: 1px solid #222; box-shadow: 0 0 30px rgba(123, 97, 255, 0.2); }
-    .login-box input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: white; box-sizing: border-box; outline: none; }
-    .login-box button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: bold; margin-top: 20px; cursor: pointer; }
+    /* 高级感登录界面 */
+    #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+    .login-box { width: 85%; max-width: 340px; text-align: center; padding: 40px 20px; }
+    .login-box h1 { font-weight: 600; font-size: 28px; margin-bottom: 30px; letter-spacing: -1px; }
+    .login-box input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 12px; border: none; background: var(--card); color: white; font-size: 16px; box-sizing: border-box; }
+    .login-box button { width: 100%; padding: 15px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: 600; font-size: 16px; margin-top: 25px; cursor: pointer; transition: opacity 0.2s; }
+    .login-box button:active { opacity: 0.7; }
 
-    /* 导航 */
-    nav { display: flex; justify-content: space-around; background: var(--card); padding: 18px 0; border-bottom: 1px solid #1f1f1f; }
-    nav button { background: none; border: none; color: #555; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.3s; }
-    nav button.active { color: var(--primary); text-shadow: 0 0 10px rgba(123, 97, 255, 0.5); }
+    /* 顶部导航 */
+    nav { display: flex; justify-content: center; background: var(--glass); backdrop-filter: blur(20px); padding: 15px 0; border-bottom: 0.5px solid #333; gap: 30px; }
+    nav button { background: none; border: none; color: #8e8e93; font-weight: 500; font-size: 15px; cursor: pointer; transition: 0.3s; position: relative; }
+    nav button.active { color: #ffffff; }
+    nav button.active::after { content: ''; position: absolute; bottom: -15px; left: 0; width: 100%; height: 2px; background: var(--primary); }
 
-    .page { display: none; flex: 1; flex-direction: column; overflow: hidden; animation: fadeIn 0.4s; }
+    .page { display: none; flex: 1; flex-direction: column; overflow: hidden; }
     .page.active { display: flex; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* 列表显示 */
-    .scroll-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    .bubble { padding: 12px 18px; border-radius: 20px; max-width: 80%; font-size: 15px; line-height: 1.5; }
-    .user { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 4px; }
-    .bot { background: #1e1e1e; align-self: flex-start; border: 1px solid #2a2a2a; border-bottom-left-radius: 4px; }
+    /* 聊天气泡 */
+    .scroll-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .bubble { padding: 12px 16px; border-radius: 18px; max-width: 75%; font-size: 15px; line-height: 1.4; animation: bubbleIn 0.3s ease-out; }
+    @keyframes bubbleIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .user { background: var(--primary); align-self: flex-end; color: white; border-bottom-right-radius: 4px; }
+    .bot { background: var(--card); align-self: flex-start; border-bottom-left-radius: 4px; }
 
     /* 秘密小圈卡片 */
-    .secret-card { background: linear-gradient(145deg, #161616, #0d0d0d); padding: 18px; border-radius: 16px; border: 1px solid #222; position: relative; box-shadow: 4px 4px 10px rgba(0,0,0,0.3); }
-    .secret-user { font-size: 12px; color: var(--primary); font-weight: bold; margin-bottom: 8px; letter-spacing: 1px; }
-    .secret-time { font-size: 10px; color: #444; position: absolute; right: 15px; top: 18px; }
+    .circle-card { background: var(--card); padding: 16px; border-radius: 14px; position: relative; margin-bottom: 8px; border-left: 3px solid var(--primary); }
+    .circle-user { font-size: 12px; color: var(--primary); font-weight: 600; margin-bottom: 6px; }
+    .circle-time { font-size: 10px; color: #48484a; position: absolute; right: 16px; top: 16px; }
 
-    /* 输入框 */
-    .input-bar { padding: 15px 15px 35px; background: var(--card); display: flex; gap: 10px; border-top: 1px solid #1f1f1f; }
-    .input-bar input { flex: 1; background: #1a1a1a; border: 1px solid #333; padding: 12px 18px; border-radius: 25px; color: white; outline: none; font-size: 15px; }
-    .input-bar button { background: var(--primary); border: none; padding: 0 20px; border-radius: 25px; color: white; font-weight: bold; cursor: pointer; }
+    /* 输入区域 */
+    .input-bar { padding: 10px 16px 34px; background: var(--bg); display: flex; gap: 10px; align-items: center; }
+    .input-bar input { flex: 1; background: #1c1c1e; border: none; padding: 12px 18px; border-radius: 22px; color: white; font-size: 15px; outline: none; }
+    .input-bar button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
-    /* 通话组件 */
-    .call-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .v-ava { width: 150px; height: 150px; border-radius: 50%; background: linear-gradient(45deg, #7b61ff, #4facfe); display: flex; align-items: center; justify-content: center; font-size: 65px; border: 5px solid #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); transition: 0.5s; }
-    .speaking { border-color: var(--primary); box-shadow: 0 0 40px rgba(123, 97, 255, 0.4); transform: scale(1.05); }
+    /* 语音界面 */
+    .call-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .ava-ring { width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, #2c2c2e 0%, #000 100%); display: flex; align-items: center; justify-content: center; position: relative; }
+    .ava-inner { width: 80px; height: 80px; border-radius: 50%; background: var(--primary); filter: blur(20px); opacity: 0.3; transition: 0.5s; }
+    .speaking .ava-inner { opacity: 0.8; transform: scale(1.5); filter: blur(30px); }
   </style>
 </head>
 <body>
 
 <div id="login-overlay">
   <div class="login-box">
-    <h1 style="color:var(--primary); font-size: 22px; margin-bottom: 5px;">VVR 秘密小圈</h1>
-    <p style="color:#666; font-size: 12px; margin-bottom: 20px;">Identity Verification Required</p>
+    <h1>系统登录</h1>
     <input type="text" id="acc" placeholder="账号">
     <input type="password" id="pwd" placeholder="密码">
-    <button onclick="vvrLogin()">确认进入</button>
+    <button onclick="handleLogin()">登录</button>
   </div>
 </div>
 
 <nav>
-  <button onclick="setTab('call')" id="t-call" class="active">深度语音</button>
-  <button onclick="setTab('chat')" id="t-chat">加密对话</button>
-  <button onclick="setTab('board')" id="t-board">秘密小圈</button>
+  <button onclick="setTab('voice')" id="t-voice" class="active">深度语音</button>
+  <button onclick="setTab('chat')" id="t-chat">和 VVR 对话</button>
+  <button onclick="setTab('circle')" id="t-circle">秘密小圈</button>
 </nav>
 
-<div id="p-call" class="page active">
-  <div class="call-main">
-    <div id="v-ava" class="v-ava">V</div>
-    <p id="c-status" style="color:#555; margin-top: 20px;">通道待命...</p>
+<div id="p-voice" class="page active">
+  <div class="call-container">
+    <div id="v-ring" class="ava-ring"><div class="ava-inner"></div></div>
+    <p id="v-status" style="margin-top:40px; color:#8e8e93; font-size:14px;">就绪</p>
   </div>
-  <div style="padding-bottom:60px; display:flex; flex-direction:column; align-items:center; gap:25px;">
-    <button id="int-btn" style="background:rgba(123, 97, 255, 0.2); color:var(--primary); border:1px solid var(--primary); padding:10px 25px; border-radius:20px; display:none; font-size:13px;" onclick="vvrInterrupt()">强制插嘴</button>
-    <div style="display:flex; gap:40px;">
-      <button id="s-btn" onclick="startVVR()" style="width:75px;height:75px;border-radius:50%;background:#2ed573;border:none;font-size:32px;box-shadow: 0 5px 15px rgba(46,213,115,0.3);">📞</button>
-      <button onclick="location.reload()" style="width:75px;height:75px;border-radius:50%;background:#ff4757;border:none;font-size:32px;box-shadow: 0 5px 15px rgba(255,71,87,0.3);">❌</button>
-    </div>
+  <div style="padding-bottom:60px; display:flex; justify-content:center; gap:30px;">
+    <button id="s-btn" onclick="startVoiceMode()" style="width:70px;height:70px;border-radius:50%;background:#34c759;border:none;font-size:28px;">📞</button>
+    <button onclick="location.reload()" style="width:70px;height:70px;border-radius:50%;background:#ff3b30;border:none;font-size:28px;">✕</button>
   </div>
 </div>
 
 <div id="p-chat" class="page">
   <div id="chat-list" class="scroll-area"></div>
-  <div class="input-bar"><input id="chat-in" placeholder="秘密传输中..."><button onclick="sendVVRText()">发送</button></div>
+  <div class="input-bar">
+    <input id="chat-in" placeholder="输入消息...">
+    <button onclick="sendSilentChat()">↑</button>
+  </div>
 </div>
 
-<div id="p-board" class="page">
-  <div id="board-list" class="scroll-area"></div>
-  <div class="input-bar"><input id="board-in" placeholder="在这留下只有圈内人懂的话..."><button onclick="pushToCircle()" style="background:var(--accent)">发布</button></div>
+<div id="p-circle" class="page">
+  <div id="circle-list" class="scroll-area"></div>
+  <div class="input-bar">
+    <input id="circle-in" placeholder="分享到小圈...">
+    <button onclick="postToCircle()" style="background:var(--accent)">↑</button>
+  </div>
 </div>
 
 <script>
-// --- 变量定义 (VVR 专用命名空间) ---
-const V_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
-const V_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
-const vClient = supabase.createClient(V_URL, V_KEY);
+const S_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
+const S_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
+const supabase = supabase.createClient(S_URL, S_KEY);
 
-let vUser = "";
-let vActive = false;
-let vHistory = [];
-const vSynth = window.speechSynthesis;
-let vRec;
+let user = "";
+let isVoiceActive = false;
+let history = [];
+const synth = window.speechSynthesis;
+let rec;
 
-// --- 1. 登录逻辑 ---
-function vvrLogin() {
+// 1. 登录
+function handleLogin() {
     const a = document.getElementById('acc').value.trim();
     const p = document.getElementById('pwd').value;
     if((a==='xiaola'&&p==='123456') || (a==='vvr'&&p==='654321')) {
-        vUser = a;
+        user = a;
         document.getElementById('login-overlay').style.display = 'none';
-        refreshCircle(); 
-    } else { alert("身份验证失败"); }
+        loadCircle();
+    } else alert("账号或密码错误");
 }
 
-// --- 2. 秘密小圈逻辑 (原留言板) ---
-async function pushToCircle() {
-    const content = document.getElementById('board-in').value.trim();
-    if(!content) return;
-    const { error } = await vClient.from('messages').insert([{ author: vUser, content: content, created_at: new Date() }]);
-    if(!error) { 
-        document.getElementById('board-in').value = ""; 
-        refreshCircle(); 
+// 2. 秘密小圈逻辑 (修复无法发送)
+async function postToCircle() {
+    const input = document.getElementById('circle-in');
+    const val = input.value.trim();
+    if(!val) return;
+    
+    const { error } = await supabase.from('messages').insert([{ author: user, content: val, created_at: new Date() }]);
+    if(!error) {
+        input.value = "";
+        loadCircle();
+    } else {
+        console.error(error);
     }
 }
 
-async function refreshCircle() {
-    const { data } = await vClient.from('messages').select('*').order('created_at', { ascending: false });
+async function loadCircle() {
+    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
     if(data) {
-        const box = document.getElementById('board-list'); box.innerHTML = "";
+        const box = document.getElementById('circle-list');
+        box.innerHTML = "";
         data.forEach(m => {
-            const d = document.createElement('div'); d.className = "secret-card";
-            d.innerHTML = `<span class="secret-time">${new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                           <div class="secret-user">● ${m.author.toUpperCase()}</div><div>${m.content}</div>`;
+            const d = document.createElement('div');
+            d.className = "circle-card";
+            d.innerHTML = `<span class="circle-time">${new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                           <div class="circle-user">${m.author}</div><div>${m.content}</div>`;
             box.appendChild(d);
         });
     }
 }
 
-// --- 3. 语音 & 文字核心 (修复发送问题) ---
-function startVVR() {
-    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    vRec = new Speech(); vRec.lang = 'en-US';
-    vRec.onresult = (e) => executeVVR(e.results[0][0].transcript, true);
-    vRec.onend = () => { if(vActive && !vSynth.speaking) vRec.start(); };
-    vActive = true;
-    document.getElementById('s-btn').style.display='none';
-    document.getElementById('int-btn').style.display='block';
-    vSynth.speak(new SpeechSynthesisUtterance("")); 
-    vvrSpeak(`Member ${vUser} verified. Secure line open.`);
-}
-
-function vvrInterrupt() {
-    if(vSynth.speaking) vSynth.cancel();
-    try { vRec.stop(); setTimeout(() => vRec.start(), 300); } catch(e) { vRec.start(); }
-}
-
-// 核心处理函数：确保文字和语音都能调用
-async function executeVVR(text, isVoice) {
-    if(isVoice && vSynth.speaking) vSynth.cancel();
-    if(!isVoice) addVVRBubble(text, 'user');
-    document.getElementById('c-status').innerText = "传输中: " + text;
+// 3. 核心对话逻辑
+async function talkToAI(text, silent) {
+    if(!silent) document.getElementById('v-status').innerText = "VVR 正在思考...";
+    else appendBubble(text, 'user');
 
     try {
-        const response = await fetch("/api/chat", { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json" }, 
-            body: JSON.stringify({ message: text, history: vHistory }) 
+        const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text, history: history })
         });
-        
-        const data = await response.json();
-        if (data.reply) {
-            vHistory.push({role:"user", content:text}, {role:"assistant", content:data.reply});
-            addVVRBubble(data.reply, 'bot');
-            vvrSpeak(data.reply);
+        const data = await res.json();
+        if(data.reply) {
+            history.push({role:"user", content:text}, {role:"assistant", content:data.reply});
+            if(silent) {
+                appendBubble(data.reply, 'bot');
+            } else {
+                speakText(data.reply);
+            }
         }
-    } catch (err) {
-        console.error("API Error:", err);
-        // 如果后端 API 不通，可以在这里给个模拟回复用于测试
-        // addVVRBubble("API 连接受限，请确认后端服务已启动。", 'bot');
+    } catch(e) { console.error(e); }
+}
+
+// 4. 语音模式专用
+function startVoiceMode() {
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    rec = new Speech(); rec.lang = 'en-US';
+    rec.onresult = (e) => talkToAI(e.results[0][0].transcript, false);
+    rec.onend = () => { if(isVoiceActive && !synth.speaking) rec.start(); };
+    isVoiceActive = true;
+    document.getElementById('s-btn').style.opacity = '0.3';
+    synth.speak(new SpeechSynthesisUtterance(""));
+    speakText("Voice mode activated.");
+}
+
+function speakText(text) {
+    const clean = text.replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'en-US';
+    u.onstart = () => { document.getElementById('v-ring').classList.add('speaking'); if(rec) try{rec.stop()}catch(e){} };
+    u.onend = () => { document.getElementById('v-ring').classList.remove('speaking'); if(isVoiceActive) setTimeout(()=>rec.start(), 500); };
+    synth.speak(u);
+}
+
+// 5. 静音聊天
+function sendSilentChat() {
+    const input = document.getElementById('chat-in');
+    if(input.value.trim()) {
+        talkToAI(input.value.trim(), true);
+        input.value = "";
     }
 }
 
-function vvrSpeak(text) {
-    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').replace(/[*_#~`[\]()<>\\|{}]/g, ' ');
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = 'en-US';
-    utter.onstart = () => { 
-        document.getElementById('v-ava').classList.add('speaking'); 
-        document.getElementById('c-status').innerText = "VVR: " + text;
-        if(vRec) try{vRec.stop()}catch(e){} 
-    };
-    utter.onend = () => { 
-        document.getElementById('v-ava').classList.remove('speaking'); 
-        if(vActive) setTimeout(()=>vRec.start(), 500); 
-    };
-    vSynth.speak(utter);
-}
-
-// --- 4. UI 交互 ---
+// UI 辅助
 function setTab(t) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
     document.getElementById('p-'+t).classList.add('active');
     document.getElementById('t-'+t).classList.add('active');
-    if(t === 'board') refreshCircle();
+    if(t === 'circle') loadCircle();
 }
 
-function sendVVRText() {
-    const input = document.getElementById('chat-in');
-    const val = input.value.trim();
-    if(val){ 
-        executeVVR(val, false); 
-        input.value = ""; 
-    }
-}
-
-function addVVRBubble(t, c) {
-    const list = document.getElementById('chat-list');
-    const d = document.createElement('div'); 
-    d.className=`bubble ${c}`; 
-    d.innerText=t;
-    list.appendChild(d); 
-    list.scrollTop = list.scrollHeight;
+function appendBubble(t, c) {
+    const box = document.getElementById('chat-list');
+    const d = document.createElement('div'); d.className=`bubble ${c}`; d.innerText=t;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
 }
 </script>
 </body>
