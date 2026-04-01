@@ -5,269 +5,127 @@
   <title>VVR World</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
   <style>
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
+    body { margin: 0; font-family: sans-serif; background: linear-gradient(135deg, #ff9a9e, #fad0c4); height: 100vh; display: flex; flex-direction: column; }
     .page { display: none; height: 100vh; flex-direction: column; width: 100%; }
     .active { display: flex; }
     .center { justify-content: center; align-items: center; }
-
-    .card {
-      background: white;
-      padding: 25px;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-      text-align: center;
-      width: 80%;
-      max-width: 300px;
-    }
-
-    input {
-      width: 90%;
-      padding: 12px;
-      margin: 10px 0;
-      border-radius: 10px;
-      border: 1px solid #eee;
-      background: #f9f9f9;
-      box-sizing: border-box;
-    }
-
-    button {
-      padding: 10px 20px;
-      border-radius: 10px;
-      border: none;
-      background: #ff6b81;
-      color: white;
-      cursor: pointer;
-      font-weight: bold;
-    }
-
-    #chat-area, #posts-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 15px;
-    }
-
-    .msg { margin: 10px 0; padding: 10px; border-radius: 10px; max-width: 80%; }
-    .user-msg { background: #4facfe; color: white; margin-left: auto; }
-    .bot-msg { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-
-    .post-card {
-      background: white;
-      padding: 15px;
-      margin-bottom: 15px;
-      border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-
-    .comment { font-size: 0.85em; background: #f8f8f8; padding: 5px; margin: 3px 0; border-radius: 5px; }
-
-    #nav {
-      display: flex;
-      justify-content: space-around;
-      background: white;
-      padding: 10px 0;
-      border-top: 1px solid #eee;
-    }
-
-    .input-box { display: flex; padding: 10px; background: white; border-top: 1px solid #eee; }
-    .input-box input { flex: 1; margin: 0 10px 0 0; }
+    .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 280px; }
+    input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #eee; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: #ff6b81; color: white; cursor: pointer; font-weight: bold; margin-top: 10px; }
+    #nav { display: flex; justify-content: space-around; background: white; padding: 10px; border-top: 1px solid #eee; }
+    .content { flex: 1; overflow-y: auto; padding: 20px; }
+    .post-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
   </style>
 </head>
-
 <body>
 
 <div id="loginPage" class="page active center">
   <div class="card">
-    <h2>Login</h2>
-    <input id="username" placeholder="用户名 (vvr / xiaola)">
-    <input id="password" type="password" placeholder="密码">
+    <h2 style="margin-bottom:20px;">Login</h2>
+    <input id="login_user" placeholder="用户名 (vvr / xiaola)">
+    <input id="login_pass" type="password" placeholder="密码">
     <button onclick="login()">Enter</button>
   </div>
 </div>
 
 <div id="mainPage" class="page">
-  
-  <div id="chatChannel" class="page active" style="height: calc(100vh - 60px);">
-    <div id="chat-area"></div>
-    <div class="input-box">
-      <input id="chatInput" placeholder="给 VVR 发消息...">
-      <button onclick="sendChat()">发送</button>
-    </div>
+  <div class="content">
+    <h3 id="welcome_msg">欢迎回来</h3>
+    <p id="db_info" style="font-size: 12px; color: #666;">正在连接数据库...</p>
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+    <div id="posts_area"></div>
   </div>
-
-  <div id="postChannel" class="page" style="height: calc(100vh - 60px);">
-    <div id="posts-area">正在加载动态...</div>
-    <div class="input-box">
-      <input id="postInput" placeholder="分享你的心情...">
-      <button onclick="addPost()">发布</button>
-    </div>
-  </div>
-
   <div id="nav">
-    <button onclick="showPage('chatChannel')">聊天</button>
-    <button onclick="showPage('postChannel')">社区</button>
-    <button onclick="logout()">退出</button>
+    <button onclick="alert('聊天功能开发中')">聊天</button>
+    <button onclick="location.reload()">退出</button>
   </div>
 </div>
 
 <script>
-// --- 2. 基础配置 ---
-const SUPABASE_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; 
-const SUPABASE_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu";
+/**
+ * 核心配置：使用你提供的最新 URL 和 Key
+ */
+const S_URL = "https://jdoqoivnzjdfmuedtmwn.supabase.co"; //
+const S_KEY = "sb_publishable_lQYWTuCHC62vrRd-9DU3GQ_rRInvutu"; //
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// 全局客户端变量，只声明一次，避免 "already been declared" 错误
+let vvrSupabase = null;
+
+try {
+  if (window.supabase) {
+    vvrSupabase = window.supabase.createClient(S_URL, S_KEY);
+    console.log("Supabase 初始化成功");
+  }
+} catch (e) {
+  console.error("初始化失败:", e);
+}
 
 const users = [
-  { username: "xiaola", password: "060530" },
-  { username: "vvr", password: "031210" }
+  { u: "xiaola", p: "060530" },
+  { u: "vvr", p: "031210" }
 ];
 
-let currentUser = null;
-
-// --- 3. 登录逻辑 ---
+/**
+ * 登录函数：对应 HTML 按钮的 onclick="login()"
+ */
 function login() {
-  const u = document.getElementById("username").value.trim().toLowerCase();
-  const p = document.getElementById("password").value.trim();
+  const uInput = document.getElementById("login_user").value.trim().toLowerCase();
+  const pInput = document.getElementById("login_pass").value.trim();
 
-  const user = users.find(item => item.username === u && item.password === p);
-  
-  if (!user) {
-    alert("账号或密码错误");
-    return;
+  const found = users.find(user => user.u === uInput && user.p === pInput);
+
+  if (found) {
+    console.log("登录验证通过");
+    // 切换界面
+    document.getElementById("loginPage").classList.remove("active");
+    document.getElementById("mainPage").classList.add("active");
+    document.getElementById("welcome_msg").innerText = "欢迎回来, " + uInput;
+
+    // 尝试从数据库读取数据
+    if (vvrSupabase) {
+      loadPosts();
+    } else {
+      document.getElementById("db_info").innerText = "插件未加载，无法读取数据";
+    }
+  } else {
+    alert("用户名或密码不正确");
   }
-
-  currentUser = user;
-  localStorage.setItem("vvr_user", JSON.stringify(user));
-  enterApp();
 }
 
-function enterApp() {
-  document.getElementById("loginPage").classList.remove("active");
-  document.getElementById("mainPage").classList.add("active");
-  loadPosts();
-}
-
-function logout() {
-  localStorage.removeItem("vvr_user");
-  location.reload();
-}
-
-function showPage(id) {
-  document.getElementById("chatChannel").classList.remove("active");
-  document.getElementById("postChannel").classList.remove("active");
-  document.getElementById(id).classList.add("active");
-}
-
-// --- 4. 聊天逻辑 ---
-function appendMsg(text, cls) {
-  const area = document.getElementById("chat-area");
-  const div = document.createElement("div");
-  div.className = "msg " + cls;
-  div.innerText = text;
-  area.appendChild(div);
-  div.scrollIntoView();
-}
-
-async function sendChat() {
-  const input = document.getElementById("chatInput");
-  const val = input.value.trim();
-  if (!val) return;
-
-  appendMsg(val, "user-msg");
-  input.value = "";
-
-  // 模拟 AI 回复 (实际可对接后端 API)
-  setTimeout(() => {
-    appendMsg("收到！由于后端未连接，我暂时只能复读：" + val, "bot-msg");
-  }, 1000);
-}
-
-// --- 5. 社区逻辑 (Supabase) ---
+/**
+ * 读取帖子数据
+ */
 async function loadPosts() {
-  const area = document.getElementById("posts-area");
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*')
-    .order('id', { ascending: false });
-
-  if (error) {
-    area.innerText = "加载失败，请检查数据库策略 (RLS)";
-    return;
-  }
-
-  area.innerHTML = "";
-  data.forEach((p, index) => {
-    const card = document.createElement("div");
-    card.className = "post-card";
+  const area = document.getElementById("posts_area");
+  try {
+    const { data, error } = await vvrSupabase.from('posts').select('*');
     
-    let commsHtml = (p.comments || []).map(c => 
-      `<div class="comment"><b>${c.user}:</b> ${c.text}</div>`
-    ).join("");
+    if (error) throw error;
 
-    card.innerHTML = `
-      <b style="color:#ff6b81">@${p.user}</b>
-      <p>${p.text}</p>
-      <div id="c-list-${p.id}">${commsHtml}</div>
-      <div style="display:flex; margin-top:10px;">
-        <input id="in-${p.id}" style="padding:5px; font-size:12px;" placeholder="评价...">
-        <button onclick="addComment(${p.id}, ${index})" style="padding:5px 10px; font-size:12px; margin-left:5px;">评论</button>
-      </div>
-    `;
-    area.appendChild(card);
-  });
-}
-
-async function addPost() {
-  const input = document.getElementById("postInput");
-  const val = input.value.trim();
-  if (!val) return;
-
-  const { error } = await supabase
-    .from('posts')
-    .insert([{ user: currentUser.username, text: val, comments: [] }]);
-
-  if (error) alert("发布失败");
-  else {
-    input.value = "";
-    loadPosts();
+    document.getElementById("db_info").innerText = "数据库已连接 ✅";
+    
+    if (data && data.length > 0) {
+      area.innerHTML = data.map(item => `
+        <div class="post-item">
+          <b style="color:#ff6b81">@${item.user}</b>
+          <p style="margin:8px 0 0 0;">${item.text}</p>
+        </div>
+      `).join('');
+    } else {
+      area.innerHTML = "<p style='color:#999'>目前还没有动态哦</p>";
+    }
+  } catch (err) {
+    console.error("读取失败:", err);
+    document.getElementById("db_info").innerText = "连接成功但无法读取数据，请检查 RLS 策略";
   }
 }
 
-async function addComment(postId, postIndex) {
-  const input = document.getElementById(`in-${postId}`);
-  const text = input.value.trim();
-  if (!text) return;
-
-  // 获取当前最新的数据
-  const { data: currentPost } = await supabase.from('posts').select('comments').eq('id', postId).single();
-  const newComments = [...(currentPost.comments || []), { user: currentUser.username, text: text }];
-
-  const { error } = await supabase
-    .from('posts')
-    .update({ comments: newComments })
-    .eq('id', postId);
-
-  if (error) alert("评论失败");
-  else loadPosts();
-}
-
-// --- 6. 自动登录检查 ---
+// 自动登录检查
 window.onload = () => {
-  const saved = localStorage.getItem("vvr_user");
-  if (saved) {
-    currentUser = JSON.parse(saved);
-    enterApp();
-  }
+  console.log("页面加载完成");
 };
 </script>
 
